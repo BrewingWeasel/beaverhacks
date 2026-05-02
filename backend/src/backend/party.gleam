@@ -4,8 +4,10 @@ import gleam/dict
 import gleam/dynamic/decode
 import gleam/erlang/process
 import gleam/json
+import gleam/list
 import gleam/otp/actor
 import gleam/result
+import iv
 
 pub type ToClientMessage {
   ChatMessageSent(contents: String)
@@ -75,6 +77,7 @@ pub type ToPartyMessage {
 pub type DirectWebsocketMessage {
   SendMessage(contents: String)
   SwapTile(from: board.Coordinate, to: board.Coordinate)
+  StartGame
 }
 
 pub fn direct_websocket_message_decoder() -> decode.Decoder(
@@ -91,6 +94,7 @@ pub fn direct_websocket_message_decoder() -> decode.Decoder(
       use to <- decode.field("to", board.coordinate_decoder())
       decode.success(SwapTile(from:, to:))
     }
+    "start_game" -> decode.success(StartGame)
     _ -> decode.failure(SendMessage(contents: ""), "DirectWebsocketMessage")
   }
 }
@@ -142,6 +146,22 @@ fn handle_message(
       dict.each(party.clients, fn(_id, member) {
         process.send(member, ChatMessageSent(message))
       })
+
+      actor.continue(party)
+    }
+    FromClientMessage(StartGame, _reply_to) -> {
+      let board = board.new(dict.keys(party.clients))
+
+      let board_contents = iv.to_list(iv.map(board.contents, iv.to_list))
+
+      let local_boards = board.get_local_boards(board)
+      let assert Ok(_) =
+        list.try_each(local_boards, fn(local_board) {
+          let #(player, board) = local_board
+          use client <- result.try(dict.get(party.clients, player))
+          process.send(client, BoardCreated(board_contents, board))
+          Ok(Nil)
+        })
 
       actor.continue(party)
     }
