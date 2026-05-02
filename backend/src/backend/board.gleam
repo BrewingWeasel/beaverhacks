@@ -146,9 +146,10 @@ pub fn new(players: List(player.Id)) -> Board {
 
   let width = 4
   let height = 2 * total_players
-  let desired_contents = iv.repeat(iv.repeat(Tile(1), 4), 2 * total_players)
+  let desired_contents = create_board(total_players)
 
   let contents = shuffle_board(desired_contents, width)
+  echo contents
 
   Board(
     contents:,
@@ -160,18 +161,28 @@ pub fn new(players: List(player.Id)) -> Board {
   )
 }
 
+fn create_board(total_players: Int) {
+  int.range(0, 2 * total_players, with: iv.new(), run: fn(acc, _y) {
+    let row =
+      int.range(0, 4, with: iv.new(), run: fn(acc, x) {
+        iv.append(acc, Tile(x % 3))
+      })
+    iv.append(acc, row)
+  })
+}
+
 pub fn is_solved(board: Board) -> Bool {
   iv.equal(board.contents, board.desired_contents)
 }
 
 fn shuffle_board(board: Array(Array(Tile)), width) -> Array(Array(Tile)) {
-  let flattened =
-    board
-    |> iv.flatten
-    |> iv.to_list
-    |> list.shuffle
-    |> iv.from_list
-  iv.sized_chunk(flattened, width)
+  board
+  |> iv.flatten
+  |> iv.to_list
+  |> list.shuffle
+  |> list.sized_chunk(width)
+  |> list.map(iv.from_list)
+  |> iv.from_list
 }
 
 fn create_divisions(
@@ -199,4 +210,28 @@ fn create_divisions(
       dict.merge(acc, dict.from_list(row))
     })
   #(submap, division)
+}
+
+pub fn get_local_boards(board: Board) -> List(#(player.Id, List(List(Tile)))) {
+  dict.fold(board.divisions, [], fn(acc, player, division) {
+    let assert Ok(rows) =
+      iv.slice(
+        board.contents,
+        division.start_y,
+        division.end_y - division.start_y + 1,
+      )
+    echo rows
+
+    let tiles =
+      rows
+      |> iv.map(fn(row) {
+        echo row
+        let assert Ok(row) =
+          iv.slice(row, division.start_x, division.end_x - division.start_x + 1)
+        iv.to_list(row)
+      })
+      |> iv.to_list()
+
+    [#(player, tiles), ..acc]
+  })
 }
