@@ -1,3 +1,4 @@
+import backend/board
 import gleam/dict
 import gleam/dynamic/decode
 import gleam/erlang/process
@@ -17,19 +18,21 @@ pub fn to_client_message_to_json(
   ])
 }
 
-pub type Id {
-  Id(Int)
+pub type PartyMode {
+  Lobby
+  InGame(board.Board)
 }
 
 pub type PartyModel {
   PartyModel(
-    clients: dict.Dict(Id, process.Subject(ToClientMessage)),
+    clients: dict.Dict(player.Id, process.Subject(ToClientMessage)),
+    current_mode: PartyMode,
     next_id: Int,
   )
 }
 
 pub type ToPartyMessage {
-  Join(process.Subject(ToClientMessage), process.Subject(Id))
+  Join(process.Subject(ToClientMessage), process.Subject(player.Id))
   FromClientMessage(
     DirectWebsocketMessage,
     reply_to: process.Subject(ToClientMessage),
@@ -54,7 +57,7 @@ pub fn new() -> Result(
   actor.Started(process.Subject(ToPartyMessage)),
   actor.StartError,
 ) {
-  actor.new(PartyModel(clients: dict.new(), next_id: 0))
+  actor.new(PartyModel(clients: dict.new(), next_id: 0, current_mode: Lobby))
   |> actor.on_message(handle_message)
   |> actor.start
 }
@@ -65,13 +68,13 @@ fn handle_message(
 ) -> actor.Next(PartyModel, ToPartyMessage) {
   case message {
     Join(client, reply_to) -> {
-      let new_clients = dict.insert(party.clients, Id(party.next_id), client)
+      let new_clients =
+        dict.insert(party.clients, player.Id(party.next_id), client)
       process.send(reply_to, Id(party.next_id))
 
-      actor.continue(PartyModel(
-        clients: new_clients,
-        next_id: party.next_id + 1,
-      ))
+      actor.continue(
+        PartyModel(..party, clients: new_clients, next_id: party.next_id + 1),
+      )
     }
     FromClientMessage(SendMessage(message), _reply_to) -> {
       dict.each(party.clients, fn(_id, member) {
@@ -93,10 +96,4 @@ pub fn handle_ws_message(
   reply_to: process.Subject(ToClientMessage),
 ) -> Nil {
   actor.send(party.data, FromClientMessage(message, reply_to))
-}
-
-pub fn decode_direct_ws_message(
-  text: String,
-) -> Result(DirectWebsocketMessage, a) {
-  todo
 }
