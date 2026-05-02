@@ -146,8 +146,7 @@ pub fn new(players: List(player.Id)) -> Board {
 
   let width = 4
   let height = 2 * total_players
-  let desired_contents = iv.repeat(iv.repeat(Tile(1), 4), 2 * total_players)
-  echo desired_contents
+  let desired_contents = create_board(total_players)
 
   let contents = shuffle_board(desired_contents, width)
   echo contents
@@ -160,6 +159,16 @@ pub fn new(players: List(player.Id)) -> Board {
     width:,
     height:,
   )
+}
+
+fn create_board(total_players: Int) {
+  int.range(0, 2 * total_players, with: iv.new(), run: fn(acc, _y) {
+    let row =
+      int.range(0, 4, with: iv.new(), run: fn(acc, x) {
+        iv.append(acc, Tile(x % 3))
+      })
+    iv.append(acc, row)
+  })
 }
 
 pub fn is_solved(board: Board) -> Bool {
