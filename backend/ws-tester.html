@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WS Tester — localhost:8000</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0f12;
+      --surface: #141720;
+      --surface2: #1c2130;
+      --border: #2a3045;
+      --accent: #00e5a0;
+      --accent-dim: rgba(0, 229, 160, 0.12);
+      --accent-dim2: rgba(0, 229, 160, 0.06);
+      --red: #ff4d6d;
+      --yellow: #ffd166;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --mono: 'IBM Plex Mono', monospace;
+      --sans: 'IBM Plex Sans', sans-serif;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+
+    .logo {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+    }
+
+    .divider { width: 1px; height: 18px; background: var(--border); }
+
+    .url-bar {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 10px;
+      flex: 1;
+      max-width: 300px;
+      transition: border-color 0.2s;
+    }
+    .url-bar:focus { outline: none; border-color: var(--accent); color: var(--text); }
+
+    .status-pill {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid;
+      transition: all 0.3s;
+    }
+    .status-pill.disconnected { color: var(--red); border-color: var(--red); background: rgba(255,77,109,0.08); }
+    .status-pill.connecting   { color: var(--yellow); border-color: var(--yellow); background: rgba(255,209,102,0.08); }
+    .status-pill.connected    { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+
+    .btn {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.15s;
+      background: transparent;
+      color: var(--text);
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim2); }
+    .btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+    .btn.primary:hover { opacity: 0.88; }
+    .btn.danger { color: var(--red); border-color: var(--red); }
+    .btn.danger:hover { background: rgba(255,77,109,0.1); }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn:disabled:hover { border-color: var(--border); color: var(--text); background: transparent; }
+
+    /* ── Layout ── */
+    .workspace {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Left panel: log ── */
+    .log-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .panel-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    #log {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 0;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.6;
+      scroll-behavior: smooth;
+    }
+    #log::-webkit-scrollbar { width: 6px; }
+    #log::-webkit-scrollbar-track { background: transparent; }
+    #log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .entry {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      padding: 4px 16px;
+      animation: fadeSlide 0.2s ease;
+    }
+    .entry:hover { background: var(--surface2); }
+
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .entry .ts {
+      color: var(--muted);
+      font-size: 10px;
+      flex-shrink: 0;
+      min-width: 68px;
+    }
+
+    .entry .tag {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .entry.recv .tag  { background: var(--accent-dim); color: var(--accent); }
+    .entry.sent .tag  { background: rgba(99,102,241,0.18); color: #a5b4fc; }
+    .entry.sys .tag   { background: rgba(100,116,139,0.18); color: var(--muted); }
+    .entry.err .tag   { background: rgba(255,77,109,0.18); color: var(--red); }
+    .entry.warn .tag  { background: rgba(255,209,102,0.14); color: var(--yellow); }
+
+    .entry .body {
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+    .entry.recv .body { color: var(--text); }
+    .entry.sent .body { color: #a5b4fc; }
+    .entry.sys .body  { color: var(--muted); }
+    .entry.err .body  { color: var(--red); }
+    .entry.warn .body { color: var(--yellow); }
+
+    /* ── Right panel: send + info ── */
+    .right-panel {
+      width: 300px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .send-panel {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    textarea#msg {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 10px 12px;
+      resize: vertical;
+      min-height: 100px;
+      transition: border-color 0.2s;
+    }
+    textarea#msg:focus { outline: none; border-color: var(--accent); }
+    textarea#msg::placeholder { color: var(--muted); }
+
+    .send-row { display: flex; gap: 8px; }
+    .send-row .btn { flex: 1; text-align: center; }
+
+    /* Stats section */
+    .stats-panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .stats-panel::-webkit-scrollbar { width: 4px; }
+    .stats-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+    }
+    .stat-row .key { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+    .stat-row .val { font-family: var(--mono); font-size: 12px; color: var(--text); }
+
+    .stat-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+    /* Ping bar */
+    .ping-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .ping-row input {
+      font-family: var(--mono);
+      font-size: 11px;
+      width: 60px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 4px;
+      padding: 4px 6px;
+    }
+    .ping-row input:focus { outline: none; border-color: var(--accent); }
+    .ping-row label { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+    /* Bottom input bar */
+    .input-bar {
+      display: flex;
+      gap: 0;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .input-bar input {
+      flex: 1;
+      font-family: var(--mono);
+      font-size: 13px;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      padding: 14px 16px;
+    }
+    .input-bar input:focus { outline: none; }
+    .input-bar input::placeholder { color: var(--muted); }
+    .input-bar .send-btn {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 0 20px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .input-bar .send-btn:hover { opacity: 0.85; }
+    .input-bar .send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 10px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 12px;
+      text-align: center;
+      padding: 20px;
+    }
+    .empty-state .icon { font-size: 32px; opacity: 0.4; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <span class="logo">WS//TEST</span>
+  <div class="divider"></div>
+  <input class="url-bar" id="urlInput" type="text" value="ws://localhost:8000" spellcheck="false" />
+  <span class="status-pill disconnected" id="statusPill">DISCONNECTED</span>
+  <button class="btn primary" id="connectBtn" onclick="connect()">Connect</button>
+  <button class="btn danger" id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+</header>
+
+<!-- WORKSPACE -->
+<div class="workspace">
+
+  <!-- LOG -->
+  <div class="log-panel">
+    <div class="panel-label">
+      <span>Event Log</span>
+      <button class="btn" style="font-size:11px;padding:3px 8px;" onclick="clearLog()">Clear</button>
+    </div>
+    <div id="log">
+      <div class="empty-state" id="emptyState">
+        <div class="icon">⚡</div>
+        <div>Connect to a WebSocket server<br>to start logging events.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="panel-label">Send Message</div>
+
+    <div class="send-panel">
+      <textarea id="msg" placeholder="Enter JSON, plain text, or any payload…"></textarea>
+      <div class="send-row">
+        <button class="btn primary" id="sendBtn" onclick="sendMsg()" disabled>Send</button>
+        <button class="btn" onclick="sendJson()" id="sendJsonBtn" disabled title="Wrap in {&quot;message&quot;: ...}">JSON wrap</button>
+      </div>
+    </div>
+
+    <div class="panel-label">Stats &amp; Tools</div>
+
+    <div class="stats-panel">
+      <div class="stat-row"><span class="key">sent</span><span class="val" id="sSent">0</span></div>
+      <div class="stat-row"><span class="key">received</span><span class="val" id="sRecv">0</span></div>
+      <div class="stat-row"><span class="key">errors</span><span class="val" id="sErr">0</span></div>
+      <div class="stat-sep"></div>
+      <div class="stat-row"><span class="key">last ping</span><span class="val" id="sPing">—</span></div>
+
+      <div class="stat-sep"></div>
+
+      <div class="panel-label" style="padding:0;margin-bottom:6px;background:none;border:none;">Auto-ping</div>
+      <div class="ping-row">
+        <input id="pingInterval" type="number" min="500" max="60000" value="3000" />
+        <label>ms</label>
+        <button class="btn" id="pingBtn" onclick="togglePing()" disabled style="flex:1;font-size:11px;">Start</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:2px;">Sends <code style="color:var(--accent)">ping</code> at interval</div>
+
+      <div class="stat-sep"></div>
+
+      <div class="panel-label" style="padding:0;margin-bottom:6px;background:none;border:none;">Quick send</div>
+      <button class="btn" onclick="quickSend('ping')" id="q1" disabled style="text-align:left;font-size:11px;">→ ping</button>
+      <button class="btn" onclick='quickSend(JSON.stringify({type:"hello",ts:Date.now()}))' id="q2" disabled style="text-align:left;font-size:11px;margin-top:6px;">→ {type:"hello", ts:…}</button>
+      <button class="btn" onclick='quickSend(JSON.stringify({type:"echo",data:"test"}))' id="q3" disabled style="text-align:left;font-size:11px;margin-top:6px;">→ {type:"echo", data:"test"}</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- BOTTOM QUICK-CHAT BAR -->
+<div class="input-bar">
+  <input id="quickInput" type="text" placeholder="Quick send — type & press Enter…" onkeydown="if(event.key==='Enter')quickSendBar()" disabled />
+  <button class="send-btn" id="quickSendBtn" onclick="quickSendBar()" disabled>↵ Send</button>
+</div>
+
+<script>
+  let ws = null;
+  let pingTimer = null;
+  let isPinging = false;
+  let stats = { sent: 0, recv: 0, err: 0 };
+  let pingStart = null;
+
+  function ts() {
+    const n = new Date();
+    return n.toTimeString().slice(0,8) + '.' + String(n.getMilliseconds()).padStart(3,'0');
+  }
+
+  function log(type, tag, body) {
+    const empty = document.getElementById('emptyState');
+    if (empty) empty.remove();
+
+    const el = document.createElement('div');
+    el.className = `entry ${type}`;
+    el.innerHTML = `<span class="ts">${ts()}</span><span class="tag">${tag}</span><span class="body">${escHtml(body)}</span>`;
+    const logEl = document.getElementById('log');
+    logEl.appendChild(el);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function updateStats() {
+    document.getElementById('sSent').textContent = stats.sent;
+    document.getElementById('sRecv').textContent = stats.recv;
+    document.getElementById('sErr').textContent  = stats.err;
+  }
+
+  function setConnected(state) {
+    const pill = document.getElementById('statusPill');
+    const conn = document.getElementById('connectBtn');
+    const disc = document.getElementById('disconnectBtn');
+    const controls = ['sendBtn','sendJsonBtn','pingBtn','q1','q2','q3','quickInput','quickSendBtn'];
+
+    if (state === 'connected') {
+      pill.className = 'status-pill connected'; pill.textContent = 'CONNECTED';
+      conn.disabled = true; disc.disabled = false;
+      controls.forEach(id => { const el = document.getElementById(id); if(el) el.disabled = false; });
+    } else if (state === 'connecting') {
+      pill.className = 'status-pill connecting'; pill.textContent = 'CONNECTING…';
+      conn.disabled = true; disc.disabled = true;
+      controls.forEach(id => { const el = document.getElementById(id); if(el) el.disabled = true; });
+    } else {
+      pill.className = 'status-pill disconnected'; pill.textContent = 'DISCONNECTED';
+      conn.disabled = false; disc.disabled = true;
+      controls.forEach(id => { const el = document.getElementById(id); if(el) el.disabled = true; });
+    }
+  }
+
+  function connect() {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) return;
+    setConnected('connecting');
+    log('sys', 'SYS', `Connecting to ${url}…`);
+
+    try {
+      ws = new WebSocket(url);
+    } catch(e) {
+      log('err','ERR', `Invalid URL: ${e.message}`);
+      setConnected('disconnected'); return;
+    }
+
+    ws.onopen = () => {
+      setConnected('connected');
+      log('sys','OPEN', `Connection established ✓`);
+    };
+
+    ws.onmessage = (e) => {
+      stats.recv++;
+      // detect pong
+      if (e.data === 'pong' && pingStart !== null) {
+        const rtt = Date.now() - pingStart;
+        document.getElementById('sPing').textContent = `${rtt} ms`;
+        pingStart = null;
+      }
+      log('recv','RECV', typeof e.data === 'string' ? e.data : '[binary]');
+      updateStats();
+    };
+
+    ws.onerror = (e) => {
+      stats.err++;
+      log('err','ERR', 'WebSocket error (check console for details)');
+      updateStats();
+    };
+
+    ws.onclose = (e) => {
+      stopPing();
+      setConnected('disconnected');
+      log('warn','CLOSE', `Connection closed — code ${e.code}${e.reason ? ' · ' + e.reason : ''}`);
+      ws = null;
+    };
+  }
+
+  function disconnect() {
+    if (ws) { ws.close(); }
+    stopPing();
+  }
+
+  function send(data) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      log('err','ERR','Not connected'); return;
+    }
+    ws.send(data);
+    stats.sent++;
+    log('sent','SENT', data);
+    updateStats();
+  }
+
+  function sendMsg() {
+    const v = document.getElementById('msg').value;
+    if (!v.trim()) return;
+    send(v);
+  }
+
+  function sendJson() {
+    const v = document.getElementById('msg').value.trim();
+    try {
+      const payload = JSON.stringify({ message: v, ts: Date.now() });
+      send(payload);
+    } catch(e) {
+      log('err','ERR', e.message);
+    }
+  }
+
+  function quickSend(data) { send(data); }
+
+  function quickSendBar() {
+    const inp = document.getElementById('quickInput');
+    const v = inp.value.trim();
+    if (!v) return;
+    send(v);
+    inp.value = '';
+  }
+
+  function clearLog() {
+    document.getElementById('log').innerHTML = '';
+    stats = { sent:0, recv:0, err:0 };
+    updateStats();
+    document.getElementById('sPing').textContent = '—';
+  }
+
+  function togglePing() {
+    if (isPinging) { stopPing(); } else { startPing(); }
+  }
+
+  function startPing() {
+    if (isPinging) return;
+    isPinging = true;
+    document.getElementById('pingBtn').textContent = 'Stop';
+    document.getElementById('pingBtn').classList.add('danger');
+    const interval = parseInt(document.getElementById('pingInterval').value) || 3000;
+    pingTimer = setInterval(() => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) { stopPing(); return; }
+      pingStart = Date.now();
+      send('ping');
+    }, interval);
+    log('sys','SYS',`Auto-ping started every ${interval}ms`);
+  }
+
+  function stopPing() {
+    if (!isPinging) return;
+    isPinging = false;
+    clearInterval(pingTimer);
+    document.getElementById('pingBtn').textContent = 'Start';
+    document.getElementById('pingBtn').classList.remove('danger');
+    log('sys','SYS','Auto-ping stopped');
+  }
+</script>
+</body>
+</html>

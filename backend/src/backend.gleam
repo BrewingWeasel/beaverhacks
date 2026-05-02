@@ -1,15 +1,16 @@
+import backend/party
 import backend/router
 import gleam/erlang/process
+import logging
 import mist
-import wisp
-import wisp/wisp_mist
 
 pub fn main() {
-  wisp.configure_logger()
-  let secret_key_base = wisp.random_string(64)
+  logging.set_level(logging.Debug)
+
+  let assert Ok(party) = party.new()
 
   let assert Ok(_) =
-    wisp_mist.handler(router.handle_request, secret_key_base)
+    router.mist_router(_, party)
     |> mist.new
     |> mist.port(8000)
     |> mist.start
