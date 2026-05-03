@@ -19,7 +19,7 @@ const score_power: Float = 1.1
 
 const milliseconds_gained: Int = 15_000
 
-const initial_time_left: Int = 20_000
+const initial_time_left: Int = 40_000
 
 pub type ToClientMessage {
   PartyCreated(id: String, player_id: Int)
