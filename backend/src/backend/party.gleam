@@ -1,3 +1,5 @@
+import gleam/string
+import logging
 import backend/board
 import backend/player
 import gleam/dict
@@ -15,6 +17,7 @@ pub type ToClientMessage {
   BoardCreated(
     full_board: List(List(board.Tile)),
     local_board: List(List(board.Tile)),
+    division: board.Division,
   )
   BoardSolved
 }
@@ -34,7 +37,7 @@ pub fn to_client_message_to_json(
         #("coordinate", board.coordinate_to_json(coordinate)),
         #("new_tile", board.tile_to_json(new_tile)),
       ])
-    BoardCreated(full_board:, local_board:) ->
+    BoardCreated(full_board:, local_board:, division:) ->
       json.object([
         #("type", json.string("board_created")),
         #(
@@ -44,6 +47,10 @@ pub fn to_client_message_to_json(
         #(
           "local_board",
           json.array(local_board, json.array(_, board.tile_to_json)),
+        ),
+        #(
+          "division",
+          board.division_to_json(division),
         ),
       ])
     BoardSolved ->
@@ -125,7 +132,10 @@ fn assume_board_open(
 fn try_board(board_result, party, continue) {
   case board_result {
     Ok(board) -> continue(board)
-    Error(_) -> actor.continue(party)
+    Error(e) -> { 
+      logging.log(logging.Warning, "Received invalid board operation: " <> string.inspect(e))
+      actor.continue(party) 
+    }
   }
 }
 
@@ -153,33 +163,42 @@ fn handle_message(
     FromClientMessage(StartGame, _reply_to, _id) -> {
       let board = board.new(dict.keys(party.clients))
 
-      let board_contents = iv.to_list(iv.map(board.contents, iv.to_list))
+      let board_contents = iv.to_list(iv.map(board.desired_contents, iv.to_list))
 
       let local_boards = board.get_local_boards(board)
       let assert Ok(_) =
         list.try_each(local_boards, fn(local_board) {
-          let #(player, board) = local_board
+          let #(player, division, board) = local_board
           use client <- result.try(dict.get(party.clients, player))
-          process.send(client, BoardCreated(board_contents, board))
+          process.send(client, BoardCreated(board_contents, board, division))
           Ok(Nil)
         })
 
-      actor.continue(party)
+      actor.continue(PartyModel(..party, current_mode: InGame(board)))
     }
     FromClientMessage(SwapTile(from_local_position, direction), _reply_to, id) -> {
+      echo from_local_position
       use board <- assume_board_open(party)
+      echo board
       use from <- try_board(
         board.local_to_global(board, id, from_local_position),
         party,
       )
+
+      logging.log(logging.Debug, "Swapping from " <> string.inspect(from))
+
       use to_position <- try_board(
         board.get_neighbor(board, from, direction),
         party,
       )
+
+      logging.log(logging.Debug, "Swapping tile to " <> string.inspect(to_position))
+
       use #(board, updated1, updated2) <- try_board(
         board.swap_tiles(board, from, to_position),
         party,
       )
+      echo board
       let send_updated_message = fn(updated: board.UpdatedTiles) {
         use client <- result.try(dict.get(party.clients, updated.player))
         process.send(client, TileUpdated(updated.location, updated.tile))

@@ -16,7 +16,7 @@ export const BoardProvider = ({ children }) => {
 			const message = JSON.parse(data._data);
 			if (message.type == "board_created") { 
 				router.push('/games/swipegame')
-				setBoard([message.board, message.local_board]);
+				setBoard([message.full_board, message.local_board, message.division]);
 			}
 		};
 	}, [socket, board]);
