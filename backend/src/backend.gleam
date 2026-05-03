@@ -12,7 +12,7 @@ import simplifile
 
 pub fn main() {
   logging.set_level(logging.Info)
-  load_env()
+  let _ = load_env()
   supabase.clear_party_rows()
 
   let assert Ok(party_manager) = party_manager.start()
@@ -28,7 +28,7 @@ pub fn main() {
 }
 
 fn load_env() {
-  let assert Ok(env_file) = simplifile.read(".env.local")
+  use env_file <- result.try(simplifile.read(".env.local"))
 
   string.split(env_file, "\n")
   |> list.filter(fn(line) { line != "" })
@@ -49,4 +49,5 @@ fn load_env() {
 
     envoy.set(key, value)
   })
+  Ok(Nil)
 }

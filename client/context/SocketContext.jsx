@@ -8,7 +8,7 @@ export const SocketProvider = ({ children }) => {
 
 	const uri =
 		Constants.expoConfig?.hostUri?.split(':').shift()?.concat(':8000') ??
-		'todo_server.fly.dev';
+		'backend-holy-pine-8273.fly.dev';
 
 
 	useEffect(() => {
