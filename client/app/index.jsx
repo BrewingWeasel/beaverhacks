@@ -60,7 +60,7 @@ export default function HomeScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#D73F09" />
       <SafeAreaView style={styles.safeHeader}>
         <View style={styles.header}>
-          <Text style={styles.title}>Dam Clever</Text>
+          <Text style={styles.title}>DamClever</Text>
         </View>
       </SafeAreaView>
 
