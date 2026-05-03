@@ -1,19 +1,20 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import Constants from "expo-constants";
+import { isDevice } from 'expo-device';
 
 const SocketContext = createContext(null);
 
 export const SocketProvider = ({ children }) => {
 	const [socket, setSocket] = useState(null);
 
-	const uri =
-		Constants.expoConfig?.hostUri?.split(':').shift()?.concat(':8000') ??
-		'backend-holy-pine-8273.fly.dev';
+	const hostedUri = 'wss://backend-holy-pine-8273.fly.dev';
+	const uri = isDevice ? hostedUri: "ws://" + Constants.expoConfig?.hostUri?.split(':').shift()?.concat(':8000') ??
+		hostedUri;
 
 
 	useEffect(() => {
 		console.log(uri)
-		const socketInstance = new WebSocket("ws://" + uri + "/ws");
+		const socketInstance = new WebSocket(uri + "/ws");
 		console.log("starting to connect")
 
 		socketInstance.onopen = () => {
