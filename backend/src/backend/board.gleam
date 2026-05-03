@@ -49,10 +49,28 @@ pub fn coordinate_to_json(coordinate: LocalCoordinate) -> json.Json {
   ])
 }
 
-pub fn coordinate_decoder() -> decode.Decoder(Coordinate) {
+pub fn coordinate_decoder() -> decode.Decoder(LocalCoordinate) {
   use x <- decode.field("x", decode.int)
   use y <- decode.field("y", decode.int)
-  decode.success(Coordinate(x:, y:))
+  decode.success(LocalCoordinate(Coordinate(x:, y:)))
+}
+
+pub type Direction {
+  Up
+  Down
+  Left
+  Right
+}
+
+pub fn direction_decoder() -> decode.Decoder(Direction) {
+  use variant <- decode.then(decode.string)
+  case variant {
+    "up" -> decode.success(Up)
+    "down" -> decode.success(Down)
+    "left" -> decode.success(Left)
+    "right" -> decode.success(Right)
+    _ -> decode.failure(Up, "Direction")
+  }
 }
 
 pub type Division {
@@ -91,6 +109,32 @@ fn set_tile(
     OutOfBounds,
   )
   Ok(Board(..board, contents: updated_contents))
+}
+
+pub fn get_neighbor(
+  board: Board,
+  location: Coordinate,
+  direction: Direction,
+) -> Result(Coordinate, BoardError) {
+  let Coordinate(x:, y:) = location
+  case direction {
+    Up if y - 1 >= 0 -> Ok(Coordinate(x:, y: y - 1))
+    Down if y <= board.height -> Ok(Coordinate(x:, y: y + 1))
+    Right if x <= board.width -> Ok(Coordinate(x: x + 1, y:))
+    Left if x - 1 >= 0 -> Ok(Coordinate(x: x - 1, y:))
+    _ -> Error(OutOfBounds)
+  }
+}
+
+pub fn local_to_global(
+  board: Board,
+  player: player.Id,
+  local_coordinate: LocalCoordinate,
+) -> Result(Coordinate, BoardError) {
+  use division <- try(dict.get(board.divisions, player), OutOfBounds)
+  let Division(start_x:, start_y:, ..) = division
+  let LocalCoordinate(Coordinate(x: local_x, y: local_y)) = local_coordinate
+  Ok(Coordinate(x: start_x + local_x, y: start_y + local_y))
 }
 
 pub type UpdatedTiles {

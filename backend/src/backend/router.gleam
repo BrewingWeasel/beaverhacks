@@ -1,4 +1,5 @@
 import backend/party
+import backend/player
 import gleam/erlang/process
 import gleam/http/request
 import gleam/http/response
@@ -29,6 +30,7 @@ type WebsocketState {
   WebsocketState(
     to_client_message_subject: process.Subject(party.ToClientMessage),
     party_connection: party.PartyActor,
+    id: player.Id,
   )
 }
 
@@ -47,11 +49,11 @@ fn init_websocket(
 ) -> #(WebsocketState, option.Option(process.Selector(party.ToClientMessage))) {
   let to_client_subject: process.Subject(party.ToClientMessage) =
     process.new_subject()
-  let _id = party.join(party, to_client_subject)
+  let id = party.join(party, to_client_subject)
   let selector = process.new_selector()
   let selector = process.select(selector, to_client_subject)
 
-  #(WebsocketState(to_client_subject, party), option.Some(selector))
+  #(WebsocketState(to_client_subject, party, id), option.Some(selector))
 }
 
 fn handle_websocket_message(
@@ -67,6 +69,7 @@ fn handle_websocket_message(
             state.party_connection,
             message,
             state.to_client_message_subject,
+            state.id,
           )
           mist.continue(state)
         }
