@@ -17,6 +17,7 @@ pub type ToClientMessage {
   BoardCreated(
     full_board: List(List(board.Tile)),
     local_board: List(List(board.Tile)),
+    division: board.Division,
   )
   BoardSolved
 }
@@ -36,7 +37,7 @@ pub fn to_client_message_to_json(
         #("coordinate", board.coordinate_to_json(coordinate)),
         #("new_tile", board.tile_to_json(new_tile)),
       ])
-    BoardCreated(full_board:, local_board:) ->
+    BoardCreated(full_board:, local_board:, division:) ->
       json.object([
         #("type", json.string("board_created")),
         #(
@@ -46,6 +47,10 @@ pub fn to_client_message_to_json(
         #(
           "local_board",
           json.array(local_board, json.array(_, board.tile_to_json)),
+        ),
+        #(
+          "division",
+          board.division_to_json(division),
         ),
       ])
     BoardSolved ->
@@ -163,9 +168,9 @@ fn handle_message(
       let local_boards = board.get_local_boards(board)
       let assert Ok(_) =
         list.try_each(local_boards, fn(local_board) {
-          let #(player, board) = local_board
+          let #(player, division, board) = local_board
           use client <- result.try(dict.get(party.clients, player))
-          process.send(client, BoardCreated(board_contents, board))
+          process.send(client, BoardCreated(board_contents, board, division))
           Ok(Nil)
         })
 

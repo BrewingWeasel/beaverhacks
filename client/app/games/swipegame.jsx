@@ -3,8 +3,6 @@ import React, { useEffect, useState } from 'react'
 import { useBoard } from '../../context/BoardContext'
 import { useSocket } from '../../context/SocketContext'
 
-const BOARD_SIZE = 4
-
 const COLORS = [
   '#FF5733', '#33FF57', '#3357FF', '#F1C40F',
   '#9B59B6', '#1ABC9C', '#E67E22', '#E74C3C',
@@ -36,8 +34,24 @@ function Tile({ tileId, onSwipe }) {
   )
 }
 
+function DemoTile({ tileId, isPartOf }) {
+  const color = COLORS[tileId]
+
+  const wrapperStyle = isPartOf ? { backgroundColor: 'yellow' } : {}
+	
+  return (
+	  <View style={wrapperStyle}>
+		<View
+		  style={[styles.desiredOutputTile, { backgroundColor: color }]}
+		/>
+	  </View>
+  )
+}
+
 export default function SwipePuzzle() {
-  const [_board, local_board] = useBoard()
+  const [desired_board, local_board, division] = useBoard()
+  console.log("desired:", desired_board)
+  console.log("division:", division)
   const [board, setBoard] = useState(local_board)
   const socket = useSocket()
   console.log(board)
@@ -82,27 +96,47 @@ export default function SwipePuzzle() {
   }
 
   return (
-    <View style={styles.container}>
-      {board.map((row, rowIndex) => (
-        <View key={rowIndex} style={styles.row}>
-          {row.map((tileId, colIndex) => (
-            <Tile
-              key={colIndex}
-              tileId={tileId}
-              onSwipe={(dir) => handleSwipe(rowIndex, colIndex, dir)}
-            />
-          ))}
-        </View>
-      ))}
-    </View>
+	  <View style={styles.container}>
+		<View style={styles.container}>
+		  {desired_board.map((row, rowIndex) => (
+			<View key={rowIndex} style={styles.row}>
+			  {row.map((tileId, colIndex) => (
+				<DemoTile
+				  key={colIndex}
+				  isPartOf={colIndex <= division.end_x && colIndex >= division.start_x && rowIndex <= division.end_y && rowIndex >= division.start_y}
+				  tileId={tileId}
+				/>
+			  ))}
+			</View>
+		  ))}
+		</View>
+		<View style={styles.container}>
+		  {board.map((row, rowIndex) => (
+			<View key={rowIndex} style={styles.row}>
+			  {row.map((tileId, colIndex) => (
+				<Tile
+				  key={colIndex}
+				  tileId={tileId}
+				  onSwipe={(dir) => handleSwipe(rowIndex, colIndex, dir)}
+				/>
+			  ))}
+			</View>
+		  ))}
+		</View>
+	  </View>
   )
 }
 
 const styles = StyleSheet.create({
+  page: {},
   container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   row: { flexDirection: 'row' },
   tile: {
     width: 60, height: 60, margin: 4,
+    borderRadius: 8,
+  },
+  desiredOutputTile: {
+    width: 20, height: 20, margin: 2,
     borderRadius: 8,
   },
 })

@@ -77,6 +77,16 @@ pub type Division {
   Division(start_x: Int, start_y: Int, end_x: Int, end_y: Int)
 }
 
+pub fn division_to_json(division: Division) -> json.Json {
+  let Division(start_x:, start_y:, end_x:, end_y:) = division
+  json.object([
+    #("start_x", json.int(start_x)),
+    #("start_y", json.int(start_y)),
+    #("end_x", json.int(end_x)),
+    #("end_y", json.int(end_y)),
+  ])
+}
+
 pub type BoardError {
   OutOfBounds
 }
@@ -264,7 +274,7 @@ fn create_divisions(
   #(submap, division)
 }
 
-pub fn get_local_boards(board: Board) -> List(#(player.Id, List(List(Tile)))) {
+pub fn get_local_boards(board: Board) -> List(#(player.Id, Division, List(List(Tile)))) {
   dict.fold(board.divisions, [], fn(acc, player, division) {
     let assert Ok(rows) =
       iv.slice(
@@ -284,6 +294,6 @@ pub fn get_local_boards(board: Board) -> List(#(player.Id, List(List(Tile)))) {
       })
       |> iv.to_list()
 
-    [#(player, tiles), ..acc]
+    [#(player, division, tiles), ..acc]
   })
 }
