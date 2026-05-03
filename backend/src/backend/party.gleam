@@ -19,7 +19,7 @@ const score_power: Float = 1.1
 
 const milliseconds_gained: Int = 15_000
 
-const initial_time_left: Int = 40_000
+const initial_time_left: Int = 20_000
 
 pub type ToClientMessage {
   ChatMessageSent(contents: String)
@@ -85,6 +85,7 @@ pub type PartyMode {
 pub type PartyModel {
   PartyModel(
     clients: dict.Dict(player.Id, process.Subject(ToClientMessage)),
+    subject: process.Subject(ToPartyMessage),
     current_mode: PartyMode,
     remaining_time: Int,
     next_id: Int,
@@ -136,15 +137,22 @@ pub fn new() -> Result(
   actor.Started(process.Subject(ToPartyMessage)),
   actor.StartError,
 ) {
-  actor.new(PartyModel(
-    clients: dict.new(),
-    remaining_time: initial_time_left,
-    next_id: 0,
-    current_mode: Lobby,
-    score: 0,
-    level: 1,
-    round_start_time: timestamp.system_time(),
-  ))
+  actor.new_with_initialiser(1000, fn(subject: process.Subject(ToPartyMessage)) {
+    let selector = process.new_selector() |> process.select(subject)
+    actor.initialised(PartyModel(
+      clients: dict.new(),
+      remaining_time: initial_time_left,
+      next_id: 0,
+      current_mode: Lobby,
+      score: 0,
+      level: 1,
+      round_start_time: timestamp.system_time(),
+      subject:,
+    ))
+    |> actor.returning(subject)
+    |> actor.selecting(selector)
+    |> Ok
+  })
   |> actor.on_message(handle_message)
   |> actor.start
 }
@@ -279,11 +287,10 @@ fn handle_message(
 
 fn start_board(party: PartyModel) {
   let board = board.new(dict.keys(party.clients))
-  let party_subject: process.Subject(ToPartyMessage) = process.new_subject()
   let timer_pid =
     process.spawn_unlinked(fn() {
       process.sleep(party.remaining_time)
-      process.send(party_subject, PartyTimeUp)
+      process.send(party.subject, PartyTimeUp)
     })
 
   let board_contents = iv.to_list(iv.map(board.desired_contents, iv.to_list))

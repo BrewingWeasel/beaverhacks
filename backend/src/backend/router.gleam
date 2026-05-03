@@ -62,6 +62,10 @@ fn handle_websocket_message(
   connection: mist.WebsocketConnection,
 ) -> mist.Next(WebsocketState, party.ToClientMessage) {
   case message {
+    mist.Text("ping") -> {
+      logging.log(logging.Info, "Client connected")
+      mist.continue(state)
+    }
     mist.Text(text) -> {
       logging.log(logging.Info, "Received message " <> text)
       case json.parse(text, party.direct_websocket_message_decoder()) {
