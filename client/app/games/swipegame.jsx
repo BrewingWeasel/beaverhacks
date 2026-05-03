@@ -1,4 +1,4 @@
-import { StyleSheet, View, PanResponder, TouchableOpacity, Animated } from 'react-native'
+import { StyleSheet, View, PanResponder, Text, TouchableOpacity, Animated } from 'react-native'
 import React, { useEffect, useState, useRef } from 'react'
 import { useBoard } from '../../context/BoardContext'
 import { useSocket } from '../../context/SocketContext'
@@ -66,12 +66,25 @@ function DemoTile({ tileId, isPartOf }) {
 }
 
 export default function SwipePuzzle() {
-  const [desired_board, local_board, division] = useBoard()
-  console.log("desired:", desired_board)
-  console.log("division:", division)
-  const [board, setBoard] = useState(local_board)
-  const socket = useSocket()
-  console.log(board)
+  const boardInfo = useBoard();
+  const division = boardInfo.division;
+  const score = boardInfo.score;
+  const [board, setBoard] = useState(boardInfo.local_board);
+  const socket = useSocket();
+
+  const [timer, setTimer] = useState(boardInfo.time_left);
+
+  useEffect(() => {
+	  console.log(score);
+
+	  console.log("desired:", boardInfo.full_board);
+	  console.log("division:", boardInfo.division);
+
+	  console.log(board);
+	  setInterval(() => {
+		  setTimer((time) => { return Math.max(0, time - 1000); });
+	  }, 1000)
+  }, [])
 
   useEffect(() => {
 	if (!socket) return;
@@ -115,7 +128,7 @@ export default function SwipePuzzle() {
   return (
 	  <View style={styles.container}>
 		<View style={styles.container}>
-		  {desired_board.map((row, rowIndex) => (
+		  {boardInfo.full_board.map((row, rowIndex) => (
 			<View key={rowIndex} style={styles.row}>
 			  {row.map((tileId, colIndex) => (
 				<DemoTile
@@ -127,6 +140,10 @@ export default function SwipePuzzle() {
 			</View>
 		  ))}
 		</View>
+		<View>
+	  		<Text>Time {Math.round(timer / 1000)}</Text>
+	  		<Text>Score {score}</Text>
+	    </View>
 		<View style={styles.container}>
 		  {board.map((row, rowIndex) => (
 			<View key={rowIndex} style={styles.row}>

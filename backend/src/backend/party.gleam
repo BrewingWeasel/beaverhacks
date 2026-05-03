@@ -16,7 +16,9 @@ import iv
 import logging
 
 const score_power: Float = 1.1
+
 const milliseconds_gained: Int = 15_000
+
 const initial_time_left: Int = 40_000
 
 pub type ToClientMessage {
@@ -26,7 +28,8 @@ pub type ToClientMessage {
     full_board: List(List(board.Tile)),
     local_board: List(List(board.Tile)),
     division: board.Division,
-    current_score: Int
+    score: Int,
+    time_left: Int,
   )
   RanOutOfTime(score: Int)
   BoardSolved
@@ -47,7 +50,7 @@ pub fn to_client_message_to_json(
         #("coordinate", board.coordinate_to_json(coordinate)),
         #("new_tile", board.tile_to_json(new_tile)),
       ])
-    BoardCreated(full_board:, local_board:, division:, current_score:) ->
+    BoardCreated(full_board:, local_board:, division:, score:, time_left:) ->
       json.object([
         #("type", json.string("board_created")),
         #(
@@ -59,7 +62,8 @@ pub fn to_client_message_to_json(
           json.array(local_board, json.array(_, board.tile_to_json)),
         ),
         #("division", board.division_to_json(division)),
-        #("current_score", json.int(current_score)),
+        #("score", json.int(score)),
+        #("time_left", json.int(time_left)),
       ])
     BoardSolved ->
       json.object([
@@ -169,7 +173,6 @@ fn try_board(board_result, party, continue) {
   }
 }
 
-
 fn handle_message(
   party: PartyModel,
   message: ToPartyMessage,
@@ -245,22 +248,23 @@ fn handle_message(
           let assert Ok(score_multipler) =
             float.power(score_power, int.to_float(party.level))
 
-          let round_completion_time = timestamp.difference(
-                party.round_start_time,
-                timestamp.system_time(),
-              )
+          let round_completion_time =
+            timestamp.difference(
+              party.round_start_time,
+              timestamp.system_time(),
+            )
 
           let time_penalty =
-            float.min(
-              duration.to_seconds(round_completion_time),
-              30.0,
-            )
+            float.min(duration.to_seconds(round_completion_time), 30.0)
           let updated_party =
             PartyModel(
               ..party,
-              score: party.score + float.round({ 100.0 -. time_penalty } *. score_multipler),
+              score: party.score
+                + float.round({ 100.0 -. time_penalty } *. score_multipler),
               level: party.level + 1,
-              remaining_time: party.remaining_time - duration.to_milliseconds(round_completion_time) + milliseconds_gained,
+              remaining_time: party.remaining_time
+                - duration.to_milliseconds(round_completion_time)
+                + milliseconds_gained,
             )
           start_board(updated_party)
         }
@@ -285,11 +289,21 @@ fn start_board(party: PartyModel) {
   let board_contents = iv.to_list(iv.map(board.desired_contents, iv.to_list))
 
   let local_boards = board.get_local_boards(board)
+  let round_start_time = timestamp.system_time()
   let assert Ok(_) =
     list.try_each(local_boards, fn(local_board) {
       let #(player, division, board) = local_board
       use client <- result.try(dict.get(party.clients, player))
-      process.send(client, BoardCreated(board_contents, board, division, party.score))
+      process.send(
+        client,
+        BoardCreated(
+          board_contents,
+          board,
+          division,
+          party.score,
+          time_left: party.remaining_time,
+        ),
+      )
 
       Ok(Nil)
     })
@@ -298,7 +312,7 @@ fn start_board(party: PartyModel) {
     PartyModel(
       ..party,
       current_mode: InGame(board, timer_pid),
-      round_start_time: timestamp.system_time(),
+      round_start_time:,
     ),
   )
 }
