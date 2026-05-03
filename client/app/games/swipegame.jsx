@@ -1,5 +1,6 @@
 import { StyleSheet, View, PanResponder } from 'react-native'
 import React, { useState } from 'react'
+import { useBoard } from '../../context/BoardContext'
 
 const BOARD_SIZE = 4
 
@@ -10,7 +11,8 @@ const COLORS = [
   '#16A085', '#8E44AD', '#C0392B', '#2980B9'
 ]
 
-function createInitialBoard() {
+function createInitialBoard(local_board) {
+  console.log(local_board)
   const shuffled = [...COLORS].sort(() => Math.random() - 0.5)
   return Array.from({ length: BOARD_SIZE }, (_, i) =>
     shuffled.slice(i * BOARD_SIZE, (i + 1) * BOARD_SIZE)
@@ -41,7 +43,8 @@ function Tile({ color, onSwipe }) {
 }
 
 export default function SwipePuzzle() {
-  const [board, setBoard] = useState(createInitialBoard())
+  const [_board, local_board] = useBoard()
+  const [board, setBoard] = useState(createInitialBoard(local_board))
 
   function handleSwipe(row, col, direction) {
     // Figure out where the neighbor is
