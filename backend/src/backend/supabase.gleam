@@ -41,7 +41,7 @@ pub fn delete_party_row(id: String) {
 
 pub fn clear_party_rows() {
   let assert Ok(_) =
-    supabase_request("parties?id=gte.0")
+    supabase_request("parties?created_at=gte.1970-01-01")
     |> request.set_method(http.Delete)
     |> httpc.send
   Nil
