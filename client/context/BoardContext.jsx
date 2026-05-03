@@ -18,10 +18,10 @@ export const BoardProvider = ({ children }) => {
 			const message = JSON.parse(data.data ?? data._data);
 			console.log("Message (in root)", message);
 			if (message.type == "party_created") {
-				setParty({ id: message.id, playerId: message.player_id, isLeader: true });
+				setParty({ id: message.id, playerId: message.player_id, description: message.description, isLeader: true });
 				router.push('/lobby');
 			} else if (message.type == "party_joined") {
-				setParty({ id: message.id, playerId: message.player_id, isLeader: false });
+				setParty({ id: message.id, description: message.description, playerId: message.player_id, isLeader: false });
 				router.push('/lobby');
 			} else if (message.type == "party_closed") {
 				setParty(null);

@@ -25,6 +25,9 @@ export default function LobbyScreen() {
       </View>
       <View style={styles.content}>
         <Text style={styles.subtitle}>
+          {party?.description ?? 'Party location not available.'}
+        </Text>
+        <Text style={styles.subtitle}>
           {party?.isLeader ? 'You are the party leader.' : 'Waiting for the party leader to start.'}
         </Text>
         {party?.id ? <Text style={styles.partyId}>Party {party.id}</Text> : null}

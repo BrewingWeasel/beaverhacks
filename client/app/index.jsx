@@ -1,4 +1,4 @@
-import { Text, View, StyleSheet, TouchableOpacity, StatusBar, Platform, ActivityIndicator, SafeAreaView } from 'react-native';
+import { Text, View, StyleSheet, TouchableOpacity, StatusBar, Platform, ActivityIndicator, SafeAreaView, Alert } from 'react-native';
 import { useSocket } from '../context/SocketContext';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase'
@@ -23,12 +23,23 @@ export default function HomeScreen() {
   async function createParty() {
     if (!userId || !socket) return;
     setLoading(true);
-    try {
-      const building = await getBuilding();
-      socket.send(JSON.stringify({ "type": "create_party", "building": building, "description": "todo" }));
-    } catch {
-      setLoading(false);
-    }
+	  Alert.prompt(
+	  	'Location',
+	  	'Enter the location (e.g. "3rd floor lounge", "Room 204")',
+	  	async (location) => {
+	  	  if (!location?.trim()) return;
+	  	  setLoading(true);
+	  	  try {
+	  		const building = await getBuilding();
+	  		socket.send(JSON.stringify({ "type": "create_party", "building": building, "description": location.trim() }));
+	  	  } catch {
+	  		setLoading(false);
+	  	  }
+	  	},
+	  	'plain-text',
+	  	'',
+	  	'default'
+      );
   }
 
   async function findParty() {
