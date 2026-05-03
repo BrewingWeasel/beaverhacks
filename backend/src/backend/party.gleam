@@ -1,5 +1,6 @@
 import backend/board
 import backend/player
+import backend/supabase
 import gleam/dict
 import gleam/dynamic/decode
 import gleam/erlang/process
@@ -111,6 +112,7 @@ pub type PartyModel {
     score: Int,
     level: Int,
     round_start_time: timestamp.Timestamp,
+    building: String,
   )
 }
 
@@ -165,10 +167,9 @@ pub fn direct_websocket_message_decoder() -> decode.Decoder(
 pub type PartyActor =
   actor.Started(process.Subject(ToPartyMessage))
 
-pub fn new() -> Result(
-  actor.Started(process.Subject(ToPartyMessage)),
-  actor.StartError,
-) {
+pub fn new(
+  building: String,
+) -> Result(actor.Started(process.Subject(ToPartyMessage)), actor.StartError) {
   actor.new_with_initialiser(1000, fn(subject: process.Subject(ToPartyMessage)) {
     let selector = process.new_selector() |> process.select(subject)
     actor.initialised(PartyModel(
@@ -179,6 +180,7 @@ pub fn new() -> Result(
       score: 0,
       level: 1,
       round_start_time: timestamp.system_time(),
+      building:,
       subject:,
     ))
     |> actor.returning(subject)
@@ -255,6 +257,7 @@ fn handle_message(
       dict.each(party.clients, fn(_id, member) {
         process.send(member, RanOutOfTime(party.score))
       })
+      supabase.increment_dorm_score(party.building, party.score)
       actor.continue(PartyModel(..party, current_mode: Lobby))
     }
     FromClientMessage(StartGame, _reply_to, _id) -> {

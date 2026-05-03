@@ -46,3 +46,21 @@ pub fn clear_party_rows() {
     |> httpc.send
   Nil
 }
+
+pub fn increment_dorm_score(dorm: String, amount: Int) {
+  let body =
+    json.object([
+      #("p_name", json.string(dorm)),
+      #("p_amount", json.int(amount)),
+    ])
+    |> json.to_string
+
+  let assert Ok(_) =
+    supabase_request("rpc/increment_score")
+    |> request.set_method(http.Post)
+    |> request.set_header("Content-Type", "application/json")
+    |> request.set_body(body)
+    |> httpc.send
+    |> echo
+  Nil
+}
