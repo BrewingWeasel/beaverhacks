@@ -310,6 +310,7 @@ fn start_board(party: PartyModel) {
           party.score,
           time_left: party.remaining_time,
         ),
+        BoardCreated(board_contents, board, division, party.score),
       )
 
       Ok(Nil)
