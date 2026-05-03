@@ -1,4 +1,5 @@
 import { StyleSheet, View, PanResponder, Text, Animated } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import React, { useEffect, useState, useRef, useImperativeHandle, forwardRef } from 'react'
 import { useBoard } from '../../context/BoardContext'
 import { useSocket } from '../../context/SocketContext'
@@ -181,6 +182,8 @@ export default function SwipePuzzle() {
   const [timer, setTimer] = useState(boardInfo.time_left)
   const [solved, setSolved] = useState(false)
   const solvedOpacity = useRef(new Animated.Value(0)).current
+  const dangerOpacity = useRef(new Animated.Value(0)).current
+  const dangerAnim = useRef(null)
 
   const tileRefs = useRef(
     boardInfo.local_board.map(row => row.map(() => React.createRef()))
@@ -196,6 +199,27 @@ export default function SwipePuzzle() {
     }, 1000)
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    if (timer <= 10000 && timer > 0) {
+      dangerAnim.current?.stop()
+      dangerOpacity.setValue(1)
+      if (timer <= 5000) {
+        dangerAnim.current = Animated.sequence([
+          Animated.timing(dangerOpacity, { toValue: 0.35, duration: 420, useNativeDriver: true }),
+          Animated.timing(dangerOpacity, { toValue: 1, duration: 80, useNativeDriver: true }),
+          Animated.timing(dangerOpacity, { toValue: 0.35, duration: 420, useNativeDriver: true }),
+        ])
+      } else {
+        dangerAnim.current = Animated.timing(dangerOpacity, { toValue: 0.3, duration: 950, useNativeDriver: true })
+      }
+      dangerAnim.current.start()
+    } else {
+      dangerAnim.current?.stop()
+      dangerAnim.current = null
+      dangerOpacity.setValue(0)
+    }
+  }, [timer])
 
   useEffect(() => {
     if (!socket) return
@@ -295,6 +319,13 @@ export default function SwipePuzzle() {
           <Text style={styles.solvedText}>Solved!</Text>
         </Animated.View>
       )}
+
+      <Animated.View style={[styles.dangerOverlay, { opacity: dangerOpacity }]} pointerEvents="none">
+        <LinearGradient colors={['rgba(255,0,0,0.55)', 'transparent']} style={styles.dangerEdgeTop} />
+        <LinearGradient colors={['rgba(255,0,0,0.55)', 'transparent']} style={styles.dangerEdgeBottom} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} />
+        <LinearGradient colors={['rgba(255,0,0,0.55)', 'transparent']} style={styles.dangerEdgeLeft} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
+        <LinearGradient colors={['rgba(255,0,0,0.55)', 'transparent']} style={styles.dangerEdgeRight} start={{ x: 1, y: 0 }} end={{ x: 0, y: 0 }} />
+      </Animated.View>
     </View>
   )
 }
@@ -362,5 +393,30 @@ const styles = StyleSheet.create({
     fontSize: 48,
     fontWeight: 'bold',
     color: '#2ECC71',
+  },
+  dangerOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    zIndex: 50,
+  },
+  dangerEdgeTop: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    height: 120,
+  },
+  dangerEdgeBottom: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    height: 120,
+  },
+  dangerEdgeLeft: {
+    position: 'absolute',
+    top: 0, bottom: 0, left: 0,
+    width: 80,
+  },
+  dangerEdgeRight: {
+    position: 'absolute',
+    top: 0, bottom: 0, right: 0,
+    width: 80,
   },
 })
