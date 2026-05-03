@@ -1,4 +1,4 @@
-import { Text, View, StyleSheet, TouchableOpacity, StatusBar, Platform, ActivityIndicator } from 'react-native';
+import { Text, View, StyleSheet, TouchableOpacity, StatusBar, Platform, ActivityIndicator, SafeAreaView } from 'react-native';
 import { useSocket } from '../context/SocketContext';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase'
@@ -6,134 +6,205 @@ import { useUserId } from './_layout';
 import { useState } from 'react';
 
 export default function HomeScreen() {
-  const topPadding = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 20; // 20 is a simple iOS safe offset
   const socket = useSocket();
   const router = useRouter();
   const userId = useUserId();
   const [loading, setLoading] = useState(false);
 
   async function getBuilding() {
-	const { data, error } = await supabase.from('profiles').select("building").eq('id', userId).single();
-	if (error) {
-		console.log(error);
-		throw error;
-	}
-
-	return data.building;
+    const { data, error } = await supabase.from('profiles').select("building").eq('id', userId).single();
+    if (error) {
+      console.log(error);
+      throw error;
+    }
+    return data.building;
   }
 
   async function createParty() {
     if (!userId || !socket) return;
-	setLoading(true);
-	try {
-		const building = await getBuilding();
-		socket.send(JSON.stringify({"type": "create_party", "building": building, "description": "todo"}));
-	} catch {
-		setLoading(false);
-	}
+    setLoading(true);
+    try {
+      const building = await getBuilding();
+      socket.send(JSON.stringify({ "type": "create_party", "building": building, "description": "todo" }));
+    } catch {
+      setLoading(false);
+    }
   }
 
   async function findParty() {
     if (!userId || loading || !socket) return;
-	setLoading(true);
-	try {
-		const building = await getBuilding();
-		const { data, error } = await supabase
-			.from('parties')
-			.select('id')
-			.eq('building', building)
-			.limit(1);
+    setLoading(true);
+    try {
+      const building = await getBuilding();
+      const { data, error } = await supabase
+        .from('parties')
+        .select('id')
+        .eq('building', building)
+        .limit(1);
 
-		if (error) throw error;
-		if (!data || data.length === 0) {
-			setLoading(false);
-			return;
-		}
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        setLoading(false);
+        return;
+      }
 
-		socket.send(JSON.stringify({"type": "join_party", "id": data[0].id}));
-	} catch (error) {
-		console.log(error);
-		setLoading(false);
-	}
+      socket.send(JSON.stringify({ "type": "join_party", "id": data[0].id }));
+    } catch (error) {
+      console.log(error);
+      setLoading(false);
+    }
   }
 
   return (
-    <View style={[styles.container, { paddingTop: topPadding }]}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Dam Clever</Text>
-      </View>
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor="#D73F09" />
+      <SafeAreaView style={styles.safeHeader}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Dam Clever</Text>
+        </View>
+      </SafeAreaView>
+
       <View style={styles.content}>
-        <Text style={styles.subtitle}>Welcome to Dam Clever!</Text>
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={createParty}
-          disabled={loading}
-        >
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Create Party</Text>}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={findParty}
-          disabled={loading}
-        >
-          <Text style={styles.buttonText}>Look For Parties</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.button}
-        >
-          <Text onPress={() => router.navigate('/settings')} style={styles.buttonText}>Settings</Text>
-        </TouchableOpacity>
+        <Text style={styles.greeting}>What would you like to do?</Text>
+
+        <View style={styles.buttonGroup}>
+          <TouchableOpacity
+            style={[styles.button, styles.buttonPrimary, loading && styles.buttonDisabled]}
+            onPress={createParty}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            {loading
+              ? <ActivityIndicator color="#fff" />
+              : (
+                <>
+                  <Text style={styles.buttonEmoji}>🎉</Text>
+                  <Text style={styles.buttonText}>Create a Party</Text>
+                </>
+              )
+            }
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.buttonSecondary, loading && styles.buttonDisabled]}
+            onPress={findParty}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.buttonEmoji}>🔍</Text>
+            <Text style={[styles.buttonText, styles.buttonTextSecondary]}>Look for Parties</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.buttonGhost]}
+            onPress={() => router.navigate('/settings')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.buttonEmoji}>⚙️</Text>
+            <Text style={[styles.buttonText, styles.buttonTextGhost]}>Settings</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#fff',
+  },
+  safeHeader: {
+    backgroundColor: '#D73F09',
   },
   header: {
-    padding: 20,
     backgroundColor: '#D73F09',
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 16,
+    paddingBottom: 28,
+    paddingHorizontal: 24,
     alignItems: 'center',
   },
   title: {
     color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 32,
+    fontWeight: '800',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+    letterSpacing: 0.5,
+  },
+  tagline: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 4,
+    letterSpacing: 0.3,
+    fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'sans-serif',
   },
   content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 28,
+    paddingBottom: 40,
+    backgroundColor: '#fff',
   },
-  subtitle: {
-    fontSize: 18,
-    color: '#333',
-    marginBottom: 20,
+  greeting: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 36,
+    fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'sans-serif-medium',
+    letterSpacing: 0.2,
   },
-  status: {
-    color: '#333',
-    marginBottom: 12,
-    textAlign: 'center',
+  buttonGroup: {
+    width: '100%',
+    gap: 14,
   },
   button: {
-    backgroundColor: '#D73F09',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 8,
-    marginTop: 12,
-    minWidth: 180,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 36,
+    borderRadius: 14,
+    width: '100%',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  buttonPrimary: {
+    backgroundColor: '#D73F09',
+  },
+  buttonSecondary: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#D73F09',
+    shadowOpacity: 0.05,
+  },
+  buttonGhost: {
+    backgroundColor: '#f4f4f4',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   buttonDisabled: {
-    opacity: 0.65,
+    opacity: 0.55,
+  },
+  buttonEmoji: {
+    fontSize: 18,
   },
   buttonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'sans-serif-medium',
+    letterSpacing: 0.3,
+  },
+  buttonTextSecondary: {
+    color: '#D73F09',
+  },
+  buttonTextGhost: {
+    color: '#555',
   },
 });
