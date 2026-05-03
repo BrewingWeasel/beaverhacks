@@ -58,6 +58,7 @@ export default function SwipePuzzle() {
 
   useEffect(() => {
 	if (!socket) return;
+  const existingOnMessage = socket.onmessage
 	socket.onmessage = (data) => {
 		console.log("Received message:", data._data);
 		const message = JSON.parse(data._data);
@@ -67,6 +68,8 @@ export default function SwipePuzzle() {
 			  newBoard[message.coordinate.y][message.coordinate.x] = message.new_tile;
 			  return newBoard;
 		  })
+		} else {
+			existingOnMessage(data);
 		}
 	};
   }, [socket])

@@ -16,8 +16,10 @@ import iv
 import logging
 
 const score_power: Float = 1.1
+
 const milliseconds_gained: Int = 15_000
-const initial_time_left: Int = 40_000
+
+const initial_time_left: Int = 20_000
 
 pub type ToClientMessage {
   ChatMessageSent(contents: String)
@@ -26,7 +28,7 @@ pub type ToClientMessage {
     full_board: List(List(board.Tile)),
     local_board: List(List(board.Tile)),
     division: board.Division,
-    current_score: Int
+    current_score: Int,
   )
   RanOutOfTime(score: Int)
   BoardSolved
@@ -81,6 +83,7 @@ pub type PartyMode {
 pub type PartyModel {
   PartyModel(
     clients: dict.Dict(player.Id, process.Subject(ToClientMessage)),
+    subject: process.Subject(ToPartyMessage),
     current_mode: PartyMode,
     remaining_time: Int,
     next_id: Int,
@@ -132,15 +135,22 @@ pub fn new() -> Result(
   actor.Started(process.Subject(ToPartyMessage)),
   actor.StartError,
 ) {
-  actor.new(PartyModel(
-    clients: dict.new(),
-    remaining_time: initial_time_left,
-    next_id: 0,
-    current_mode: Lobby,
-    score: 0,
-    level: 1,
-    round_start_time: timestamp.system_time(),
-  ))
+  actor.new_with_initialiser(1000, fn(subject: process.Subject(ToPartyMessage)) {
+    let selector = process.new_selector() |> process.select(subject)
+    actor.initialised(PartyModel(
+      clients: dict.new(),
+      remaining_time: initial_time_left,
+      next_id: 0,
+      current_mode: Lobby,
+      score: 0,
+      level: 1,
+      round_start_time: timestamp.system_time(),
+      subject:,
+    ))
+    |> actor.returning(subject)
+    |> actor.selecting(selector)
+    |> Ok
+  })
   |> actor.on_message(handle_message)
   |> actor.start
 }
@@ -168,7 +178,6 @@ fn try_board(board_result, party, continue) {
     }
   }
 }
-
 
 fn handle_message(
   party: PartyModel,
@@ -245,22 +254,23 @@ fn handle_message(
           let assert Ok(score_multipler) =
             float.power(score_power, int.to_float(party.level))
 
-          let round_completion_time = timestamp.difference(
-                party.round_start_time,
-                timestamp.system_time(),
-              )
+          let round_completion_time =
+            timestamp.difference(
+              party.round_start_time,
+              timestamp.system_time(),
+            )
 
           let time_penalty =
-            float.min(
-              duration.to_seconds(round_completion_time),
-              30.0,
-            )
+            float.min(duration.to_seconds(round_completion_time), 30.0)
           let updated_party =
             PartyModel(
               ..party,
-              score: party.score + float.round({ 100.0 -. time_penalty } *. score_multipler),
+              score: party.score
+                + float.round({ 100.0 -. time_penalty } *. score_multipler),
               level: party.level + 1,
-              remaining_time: party.remaining_time - duration.to_milliseconds(round_completion_time) + milliseconds_gained,
+              remaining_time: party.remaining_time
+                - duration.to_milliseconds(round_completion_time)
+                + milliseconds_gained,
             )
           start_board(updated_party)
         }
@@ -275,11 +285,10 @@ fn handle_message(
 
 fn start_board(party: PartyModel) {
   let board = board.new(dict.keys(party.clients))
-  let party_subject: process.Subject(ToPartyMessage) = process.new_subject()
   let timer_pid =
     process.spawn_unlinked(fn() {
       process.sleep(party.remaining_time)
-      process.send(party_subject, PartyTimeUp)
+      process.send(party.subject, PartyTimeUp)
     })
 
   let board_contents = iv.to_list(iv.map(board.desired_contents, iv.to_list))
@@ -289,7 +298,10 @@ fn start_board(party: PartyModel) {
     list.try_each(local_boards, fn(local_board) {
       let #(player, division, board) = local_board
       use client <- result.try(dict.get(party.clients, player))
-      process.send(client, BoardCreated(board_contents, board, division, party.score))
+      process.send(
+        client,
+        BoardCreated(board_contents, board, division, party.score),
+      )
 
       Ok(Nil)
     })

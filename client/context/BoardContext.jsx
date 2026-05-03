@@ -14,9 +14,13 @@ export const BoardProvider = ({ children }) => {
 		if (!socket) return;
 		socket.onmessage = (data) => {
 			const message = JSON.parse(data._data);
+			console.log("Message (in root)", message);
 			if (message.type == "board_created") { 
 				router.push('/games/swipegame')
 				setBoard([message.full_board, message.local_board, message.division]);
+			} else if (message.type == "ran_out_of_time") { 
+				console.log("Game over! Final score:", message.score);
+				router.push('/games/gameover/' + message.score.toString())
 			}
 		};
 	}, [socket, board]);
