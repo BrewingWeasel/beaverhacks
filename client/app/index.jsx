@@ -1,9 +1,11 @@
 import { Text, View, StyleSheet, TouchableOpacity, StatusBar, Platform } from 'react-native';
 import { useSocket } from '../context/SocketContext';
+import { Link, useRouter } from 'expo-router';
 
 export default function HomeScreen() {
   const topPadding = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 20; // 20 is a simple iOS safe offset
   const socket = useSocket();
+  const router = useRouter();
 
 
   const start = () => {
@@ -23,6 +25,11 @@ export default function HomeScreen() {
           onPress={start}
         >
           <Text style={styles.buttonText}>Start Game</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.button}
+        >
+          <Text onPress={() => router.navigate('/settings')} style={styles.buttonText}>Settings</Text>
         </TouchableOpacity>
       </View>
     </View>

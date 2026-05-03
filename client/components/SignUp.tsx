@@ -56,10 +56,11 @@ export default function SignUp({ onNavigateToSignIn }: SignUpProps) {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: { username, building: selectedBuilding.label },
-      },
+      // options: {
+      //   data: { username, building: selectedBuilding.label },
+      // },
     })
+	console.log('Sign up error:', error)
     if (error) Alert.alert(error.message)
     setLoading(false)
   }
