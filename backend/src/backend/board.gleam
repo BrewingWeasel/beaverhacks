@@ -190,12 +190,28 @@ pub fn new(players: List(player.Id)) -> Board {
       from: #(dict.new(), dict.new()),
       with: fn(acc, player, index) {
         let #(total_divisions, coordinate_owner_map) = acc
+        let #(start_x, end_x, start_y, end_y) = case total_players  {
+          1 -> #(0, 2, 0, 2)
+          2 if index == 0 -> #(0, 3, 0, 1)
+          2 if index == 1 -> #(0, 3, 2, 3)
+
+          3 if index == 0 -> #(0, 3, 0, 1)
+          3 if index == 1 -> #(0, 1, 2, 5)
+          3 if index == 2 -> #(2, 3, 2, 5)
+
+          4 if index == 0 -> #(0, 2, 0, 2)
+          4 if index == 1 -> #(3, 5, 0, 2)
+          4 if index == 2 -> #(0, 2, 3, 5)
+          4 if index == 3 -> #(3, 5, 3, 5)
+
+          _ -> #(0, 3, index * 2, index * 2 + 1)
+        }
         let #(submap, division) =
           create_divisions(
-            start_x: 0,
-            end_x: 3,
-            start_y: index * 2,
-            end_y: index * 2 + 1,
+            start_x:,
+            end_x:,
+            start_y:,
+            end_y:,
             player:,
           )
         #(
@@ -205,8 +221,13 @@ pub fn new(players: List(player.Id)) -> Board {
       },
     )
 
-  let width = 4
-  let height = 2 * total_players
+  let #(width, height) = case total_players {
+    1 -> #(3, 3)
+    2 -> #(4, 4)
+    3 -> #(4, 6)
+    4 -> #(6, 6)
+    _ -> #(4, 2 * total_players)
+  }
   let desired_contents = create_board(total_players)
 
   let contents = shuffle_board(desired_contents, width)

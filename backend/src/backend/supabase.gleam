@@ -61,6 +61,5 @@ pub fn increment_dorm_score(dorm: String, amount: Int) {
     |> request.set_header("Content-Type", "application/json")
     |> request.set_body(body)
     |> httpc.send
-    |> echo
   Nil
 }
