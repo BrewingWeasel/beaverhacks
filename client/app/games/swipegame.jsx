@@ -1,5 +1,5 @@
-import { StyleSheet, View, PanResponder } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import { StyleSheet, View, PanResponder, TouchableOpacity, Animated } from 'react-native'
+import React, { useEffect, useState, useRef } from 'react'
 import { useBoard } from '../../context/BoardContext'
 import { useSocket } from '../../context/SocketContext'
 
@@ -12,23 +12,40 @@ const COLORS = [
 
 function Tile({ tileId, onSwipe }) {
   const color = COLORS[tileId]
+  const pos = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current
+  const MOVE = 60 + 4 * 2
+
   const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: (_, g) =>
-      Math.abs(g.dx) > 10 || Math.abs(g.dy) > 10,
+      Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6,
     onPanResponderRelease: (_, g) => {
       const absDx = Math.abs(g.dx)
       const absDy = Math.abs(g.dy)
+      let dir = null
+      const to = { x: 0, y: 0 }
+
       if (absDx > absDy) {
-        onSwipe(g.dx > 0 ? 'right' : 'left')
+        dir = g.dx > 0 ? 'right' : 'left'
+        to.x = dir === 'right' ? MOVE : -MOVE
       } else {
-        onSwipe(g.dy > 0 ? 'down' : 'up')
+        dir = g.dy > 0 ? 'down' : 'up'
+        to.y = dir === 'down' ? MOVE : -MOVE
       }
+
+      Animated.timing(pos, { toValue: to, duration: 150, useNativeDriver: false }).start(() => {
+        onSwipe && onSwipe(dir)
+        pos.setValue({ x: 0, y: 0 })
+      })
+    },
+    onPanResponderTerminate: () => {
+      pos.setValue({ x: 0, y: 0 })
     },
   })
 
   return (
-    <View
-      style={[styles.tile, { backgroundColor: color }]}
+    <Animated.View
+      style={[styles.tile, { backgroundColor: color, transform: pos.getTranslateTransform() }]}
       {...panResponder.panHandlers}
     />
   )
