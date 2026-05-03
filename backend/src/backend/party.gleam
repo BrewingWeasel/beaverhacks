@@ -71,12 +71,13 @@ pub type ToPartyMessage {
   FromClientMessage(
     DirectWebsocketMessage,
     reply_to: process.Subject(ToClientMessage),
+    id: player.Id,
   )
 }
 
 pub type DirectWebsocketMessage {
   SendMessage(contents: String)
-  SwapTile(from: board.Coordinate, to: board.Coordinate)
+  SwapTile(from: board.LocalCoordinate, direction: board.Direction)
   StartGame
 }
 
@@ -91,8 +92,8 @@ pub fn direct_websocket_message_decoder() -> decode.Decoder(
     }
     "swap_tile" -> {
       use from <- decode.field("from", board.coordinate_decoder())
-      use to <- decode.field("to", board.coordinate_decoder())
-      decode.success(SwapTile(from:, to:))
+      use direction <- decode.field("direction", board.direction_decoder())
+      decode.success(SwapTile(from:, direction:))
     }
     "start_game" -> decode.success(StartGame)
     _ -> decode.failure(SendMessage(contents: ""), "DirectWebsocketMessage")
@@ -142,14 +143,14 @@ fn handle_message(
         PartyModel(..party, clients: new_clients, next_id: party.next_id + 1),
       )
     }
-    FromClientMessage(SendMessage(message), _reply_to) -> {
+    FromClientMessage(SendMessage(message), _reply_to, _id) -> {
       dict.each(party.clients, fn(_id, member) {
         process.send(member, ChatMessageSent(message))
       })
 
       actor.continue(party)
     }
-    FromClientMessage(StartGame, _reply_to) -> {
+    FromClientMessage(StartGame, _reply_to, _id) -> {
       let board = board.new(dict.keys(party.clients))
 
       let board_contents = iv.to_list(iv.map(board.contents, iv.to_list))
@@ -165,10 +166,18 @@ fn handle_message(
 
       actor.continue(party)
     }
-    FromClientMessage(SwapTile(from, to), _reply_to) -> {
+    FromClientMessage(SwapTile(from_local_position, direction), _reply_to, id) -> {
       use board <- assume_board_open(party)
+      use from <- try_board(
+        board.local_to_global(board, id, from_local_position),
+        party,
+      )
+      use to_position <- try_board(
+        board.get_neighbor(board, from, direction),
+        party,
+      )
       use #(board, updated1, updated2) <- try_board(
-        board.swap_tiles(board, from, to),
+        board.swap_tiles(board, from, to_position),
         party,
       )
       let send_updated_message = fn(updated: board.UpdatedTiles) {
@@ -202,6 +211,7 @@ pub fn handle_ws_message(
   party: PartyActor,
   message: DirectWebsocketMessage,
   reply_to: process.Subject(ToClientMessage),
+  id: player.Id,
 ) -> Nil {
-  actor.send(party.data, FromClientMessage(message, reply_to))
+  actor.send(party.data, FromClientMessage(message, reply_to, id))
 }
