@@ -1,22 +1,14 @@
 import { Text, View, StyleSheet, TouchableOpacity, StatusBar, Platform } from 'react-native';
-import { useEffect } from 'react';
 import { useSocket } from '../context/SocketContext';
-import { useRouter } from 'expo-router';
 
 export default function HomeScreen() {
-  const router = useRouter();
   const topPadding = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 20; // 20 is a simple iOS safe offset
   const socket = useSocket();
 
-  useEffect(() => {
-    if (!socket) return;
-    socket.onmessage = (data) => console.log(data);
-  }, [socket]);
 
   const start = () => {
     if (!socket) return;
 	socket.send(JSON.stringify({"type": "start_game"}));
-	// router.push('/startgame')
   }
 
   return (
