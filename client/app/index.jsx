@@ -1,16 +1,31 @@
 import { Text, View, StyleSheet, TouchableOpacity, StatusBar, Platform } from 'react-native';
 import { useSocket } from '../context/SocketContext';
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
+import { supabase } from '../lib/supabase'
+import { useUserId } from './_layout';
 
 export default function HomeScreen() {
   const topPadding = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 20; // 20 is a simple iOS safe offset
   const socket = useSocket();
   const router = useRouter();
-
+  const userId = useUserId();
 
   const start = () => {
     if (!socket) return;
 	socket.send(JSON.stringify({"type": "start_game"}));
+  }
+
+  async function createParty() {
+    if (!socket || !userId) return;
+	console.log("Creating party for user:", userId);
+
+	
+	const { data, error } = await supabase.from('profiles').select("building").eq('id', userId).single();
+	if (error) {
+        console.log(error)
+	}
+
+	socket.send(JSON.stringify({"type": "create_party", "building": data.building, "description": "todo"}));
   }
 
   return (
@@ -25,6 +40,12 @@ export default function HomeScreen() {
           onPress={start}
         >
           <Text style={styles.buttonText}>Start Game</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={createParty}
+        >
+          <Text style={styles.buttonText}>Create Party</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.button}
