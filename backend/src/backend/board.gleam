@@ -222,11 +222,78 @@ pub fn new(players: List(player.Id)) -> Board {
   )
 }
 
+fn all_tiles() -> List(Tile) {
+  int.range(0, 5, with: [], run: fn(acc, tile_id) {
+    [Tile(tile_id), ..acc]
+  })
+}
+
 fn create_board(total_players: Int) {
-  int.range(0, 2 * total_players, with: iv.new(), run: fn(acc, _y) {
+  let assert [tile1, tile2, tile3, tile4, ..] = list.shuffle(all_tiles())
+  let #(width, height) = case total_players {
+    1 -> #(3, 3)
+    2 -> #(4, 4)
+    3 -> #(4, 6)
+    4 -> #(6, 6)
+    // TODO: figure out
+    _ -> #(8, 8)
+  }
+  // square_in_tiles(4, 2 * total_players, True, tile1, tile2, tile3)
+  case int.random(12) {
+    v if v <= 4 -> square_in_tiles(width, height, True, tile1, tile2, tile3)
+    v if v <= 6 -> square_in_tiles(width, height, False, tile1, tile2, tile3)
+    v if v <= 8 -> grid(width, height, tile1, tile2, tile3, tile4)
+    _ -> diagonal(width, height, tile1, tile2, tile3)
+  }
+}
+
+fn grid(width: Int, height: Int, tile1: Tile, tile2: Tile, tile3: Tile, tile4: Tile) {
+  int.range(0, height, with: iv.new(), run: fn(acc, y) {
+    let half_height = height / 2
+    let half_width = width / 2
     let row =
-      int.range(0, 4, with: iv.new(), run: fn(acc, x) {
-        iv.append(acc, Tile(x % 3))
+      int.range(0, width, with: iv.new(), run: fn(acc, x) {
+        let tile = case x, y {
+          x, y if x < half_width && y < half_height -> tile1
+          x, y if x >= half_width && y < half_height -> tile2
+          x, y if x < half_width && y >= half_height -> tile3
+          _, _ -> tile4
+        }
+        iv.append(acc, tile)
+      })
+    iv.append(acc, row)
+  })
+}
+fn diagonal(width: Int, height: Int, tile1: Tile, tile2: Tile, tile3: Tile) {
+  int.range(0, height, with: iv.new(), run: fn(acc, y) {
+    let row =
+      int.range(0, width, with: iv.new(), run: fn(acc, x) {
+        let tile = case x, y {
+          x, y if x == y -> tile2
+          x, y if width - 1 - x == y -> tile3
+          _, _ -> tile1
+        }
+        iv.append(acc, tile)
+      })
+    iv.append(acc, row)
+  })
+}
+
+fn square_in_tiles(width: Int, height: Int, alternating: Bool, tile1: Tile, tile2: Tile, tile3: Tile) {
+  int.range(0, height, with: iv.new(), run: fn(acc, y) {
+    let half_height = height / 2
+    let half_width = width / 2
+    let row =
+      int.range(0, width, with: iv.new(), run: fn(acc, x) {
+        let tile = case x, y {
+          _, y if y == 0 && !alternating || y == height - 1 && !alternating -> tile2
+          x, y if x == 0 && y < half_height || x == width - 1 && y >= half_height -> tile2
+          x, y if x == 0 && y >= half_height || x == width - 1 && y < half_height -> tile3
+          x, y if y == 0 && x < half_width || y == height - 1 && x >= half_width -> tile2
+          x, y if y == 0 && x >= half_width || y == height - 1 && x < half_width -> tile3
+          _, _ -> tile1
+        }
+        iv.append(acc, tile)
       })
     iv.append(acc, row)
   })
