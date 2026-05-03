@@ -1,3 +1,5 @@
+import logging
+import gleam/string
 import backend/player
 import gleam/dict
 import gleam/dynamic/decode
@@ -28,9 +30,7 @@ pub type Tile {
 
 pub fn tile_to_json(tile: Tile) -> json.Json {
   let Tile(tile_id:) = tile
-  json.object([
-    #("tile_id", json.int(tile_id)),
-  ])
+  json.int(tile_id)
 }
 
 pub type Coordinate {
@@ -116,7 +116,8 @@ pub fn get_neighbor(
   location: Coordinate,
   direction: Direction,
 ) -> Result(Coordinate, BoardError) {
-  let Coordinate(x:, y:) = location
+  let Coordinate(x:, y:) = echo location
+  echo direction
   case direction {
     Up if y - 1 >= 0 -> Ok(Coordinate(x:, y: y - 1))
     Down if y <= board.height -> Ok(Coordinate(x:, y: y + 1))
@@ -146,6 +147,7 @@ pub fn swap_tiles(
   location1: Coordinate,
   location2: Coordinate,
 ) -> Result(#(Board, UpdatedTiles, UpdatedTiles), BoardError) {
+  echo board.coordinate_owner_map
   use tile1_info <- try(
     dict.get(board.coordinate_owner_map, location1),
     OutOfBounds,
@@ -154,10 +156,15 @@ pub fn swap_tiles(
     dict.get(board.coordinate_owner_map, location2),
     OutOfBounds,
   )
+  logging.log(logging.Debug, "Owner of tile1 " <> string.inspect(tile1_info.owner))
+  logging.log(logging.Debug, "Owner of tile2 " <> string.inspect(tile1_info.owner))
+
   use tile1 <- result.try(get_tile(location1, board))
-  use tile2 <- result.try(get_tile(location1, board))
+  use tile2 <- result.try(get_tile(location2, board))
+  logging.log(logging.Debug, "Got tiles")
   use board <- result.try(set_tile(location1, board, tile2))
-  use board <- result.try(set_tile(location1, board, tile1))
+  use board <- result.try(set_tile(location2, board, tile1))
+  logging.log(logging.Debug, "Set tiles")
   Ok(#(
     board,
     UpdatedTiles(tile1_info.coordinate, tile1_info.owner, tile2),
@@ -238,11 +245,11 @@ fn create_divisions(
 ) -> #(dict.Dict(Coordinate, LocalInfo), Division) {
   let division = Division(start_x, start_y, end_x, end_y)
   let submap =
-    int.range(from: end_y, to: start_y, with: dict.new(), run: fn(acc, y) {
+    int.range(from: start_y, to: end_y + 1, with: dict.new(), run: fn(acc, y) {
       let row =
-        int.range(from: end_x, to: start_x, with: [], run: fn(acc, x) {
-          let local_x = start_x - x
-          let local_y = start_x - x
+        int.range(from: start_x, to: end_x + 1, with: [], run: fn(acc, x) {
+          let local_x = x - start_x
+          let local_y = y - start_y
           [
             #(
               Coordinate(x:, y:),
@@ -253,6 +260,7 @@ fn create_divisions(
         })
       dict.merge(acc, dict.from_list(row))
     })
+  echo submap
   #(submap, division)
 }
 

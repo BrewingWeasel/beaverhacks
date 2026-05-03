@@ -1,6 +1,7 @@
 import { StyleSheet, View, PanResponder } from 'react-native'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useBoard } from '../../context/BoardContext'
+import { useSocket } from '../../context/SocketContext'
 
 const BOARD_SIZE = 4
 
@@ -11,15 +12,8 @@ const COLORS = [
   '#16A085', '#8E44AD', '#C0392B', '#2980B9'
 ]
 
-function createInitialBoard(local_board) {
-  console.log(local_board)
-  const shuffled = [...COLORS].sort(() => Math.random() - 0.5)
-  return Array.from({ length: BOARD_SIZE }, (_, i) =>
-    shuffled.slice(i * BOARD_SIZE, (i + 1) * BOARD_SIZE)
-  )
-}
-
-function Tile({ color, onSwipe }) {
+function Tile({ tileId, onSwipe }) {
+  const color = COLORS[tileId]
   const panResponder = PanResponder.create({
     onMoveShouldSetPanResponder: (_, g) =>
       Math.abs(g.dx) > 10 || Math.abs(g.dy) > 10,
@@ -44,36 +38,57 @@ function Tile({ color, onSwipe }) {
 
 export default function SwipePuzzle() {
   const [_board, local_board] = useBoard()
-  const [board, setBoard] = useState(createInitialBoard(local_board))
+  const [board, setBoard] = useState(local_board)
+  const socket = useSocket()
+  console.log(board)
+
+  useEffect(() => {
+	if (!socket) return;
+	socket.onmessage = (data) => {
+		console.log("Received message:", data._data);
+		const message = JSON.parse(data._data);
+		if (message.type == "tile_updated") { 
+		  setBoard((prev) => {
+			  const newBoard = [...prev];
+			  newBoard[message.coordinate.y][message.coordinate.x] = message.new_tile;
+			  return newBoard;
+		  })
+		}
+	};
+  }, [socket])
 
   function handleSwipe(row, col, direction) {
-    // Figure out where the neighbor is
-    const neighborRow = row + (direction === 'down' ? 1 : direction === 'up' ? -1 : 0)
-    const neighborCol = col + (direction === 'right' ? 1 : direction === 'left' ? -1 : 0)
-
-    // If neighbor is out of bounds, do nothing
-    if (
-      neighborRow < 0 || neighborRow >= BOARD_SIZE ||
-      neighborCol < 0 || neighborCol >= BOARD_SIZE
-    ) return
-
-    setBoard(prev => {
-      const newBoard = prev.map(r => [...r])
-      const temp = newBoard[row][col]
-      newBoard[row][col] = newBoard[neighborRow][neighborCol]
-      newBoard[neighborRow][neighborCol] = temp
-      return newBoard
-    })
+	  if (!socket) return;
+	  socket.send(JSON.stringify({"type": "swap_tile", "from": {"x": col, "y": row}, "direction": direction}))
+	// Old swipe handling - could still be useful?
+	  
+    // // Figure out where the neighbor is
+    // const neighborRow = row + (direction === 'down' ? 1 : direction === 'up' ? -1 : 0)
+    // const neighborCol = col + (direction === 'right' ? 1 : direction === 'left' ? -1 : 0)
+    //
+    // // If neighbor is out of bounds, do nothing
+    // if (
+    //   neighborRow < 0 || neighborRow >= BOARD_SIZE ||
+    //   neighborCol < 0 || neighborCol >= BOARD_SIZE
+    // ) return
+    //
+    // setBoard(prev => {
+    //   const newBoard = prev.map(r => [...r])
+    //   const temp = newBoard[row][col]
+    //   newBoard[row][col] = newBoard[neighborRow][neighborCol]
+    //   newBoard[neighborRow][neighborCol] = temp
+    //   return newBoard
+    // })
   }
 
   return (
     <View style={styles.container}>
       {board.map((row, rowIndex) => (
         <View key={rowIndex} style={styles.row}>
-          {row.map((color, colIndex) => (
+          {row.map((tileId, colIndex) => (
             <Tile
               key={colIndex}
-              color={color}
+              tileId={tileId}
               onSwipe={(dir) => handleSwipe(rowIndex, colIndex, dir)}
             />
           ))}

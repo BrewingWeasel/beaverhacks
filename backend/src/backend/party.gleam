@@ -1,3 +1,5 @@
+import gleam/string
+import logging
 import backend/board
 import backend/player
 import gleam/dict
@@ -125,7 +127,10 @@ fn assume_board_open(
 fn try_board(board_result, party, continue) {
   case board_result {
     Ok(board) -> continue(board)
-    Error(_) -> actor.continue(party)
+    Error(e) -> { 
+      logging.log(logging.Warning, "Received invalid board operation: " <> string.inspect(e))
+      actor.continue(party) 
+    }
   }
 }
 
@@ -153,7 +158,7 @@ fn handle_message(
     FromClientMessage(StartGame, _reply_to, _id) -> {
       let board = board.new(dict.keys(party.clients))
 
-      let board_contents = iv.to_list(iv.map(board.contents, iv.to_list))
+      let board_contents = iv.to_list(iv.map(board.desired_contents, iv.to_list))
 
       let local_boards = board.get_local_boards(board)
       let assert Ok(_) =
@@ -164,22 +169,31 @@ fn handle_message(
           Ok(Nil)
         })
 
-      actor.continue(party)
+      actor.continue(PartyModel(..party, current_mode: InGame(board)))
     }
     FromClientMessage(SwapTile(from_local_position, direction), _reply_to, id) -> {
+      echo from_local_position
       use board <- assume_board_open(party)
+      echo board
       use from <- try_board(
         board.local_to_global(board, id, from_local_position),
         party,
       )
+
+      logging.log(logging.Debug, "Swapping from " <> string.inspect(from))
+
       use to_position <- try_board(
         board.get_neighbor(board, from, direction),
         party,
       )
+
+      logging.log(logging.Debug, "Swapping tile to " <> string.inspect(to_position))
+
       use #(board, updated1, updated2) <- try_board(
         board.swap_tiles(board, from, to_position),
         party,
       )
+      echo board
       let send_updated_message = fn(updated: board.UpdatedTiles) {
         use client <- result.try(dict.get(party.clients, updated.player))
         process.send(client, TileUpdated(updated.location, updated.tile))
