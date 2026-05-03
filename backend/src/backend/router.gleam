@@ -1,4 +1,5 @@
 import backend/party
+import backend/party_manager
 import backend/player
 import gleam/erlang/process
 import gleam/http/request
@@ -11,13 +12,20 @@ import mist
 import wisp
 import wisp/wisp_mist
 
+pub type RouterParams {
+  RouterParams(
+    party_manager: party_manager.PartyManagerActor,
+    party: party.PartyActor,
+  )
+}
+
 pub fn mist_router(
   request: request.Request(mist.Connection),
-  party: party.PartyActor,
+  router_params: RouterParams,
 ) -> response.Response(mist.ResponseData) {
   let secret_key_base = wisp.random_string(64)
   case request.path_segments(request) {
-    ["ws"] -> upgrade_to_websockets(request, party)
+    ["ws"] -> upgrade_to_websockets(request, router_params)
     _ -> wisp_mist.handler(wisp_handle_request, secret_key_base)(request)
   }
 }
@@ -29,15 +37,19 @@ fn wisp_handle_request(_request) {
 type WebsocketState {
   WebsocketState(
     to_client_message_subject: process.Subject(party.ToClientMessage),
-    party_connection: party.PartyActor,
-    id: player.Id,
+    party_info: PartyInfo,
+    party_manager: party_manager.PartyManagerActor,
   )
 }
 
-fn upgrade_to_websockets(req, party) {
+type PartyInfo {
+  PartyInfo(party_connection: party.PartyActor, id: player.Id)
+}
+
+fn upgrade_to_websockets(req, router_params) {
   mist.websocket(
     req,
-    on_init: init_websocket(_, party),
+    on_init: init_websocket(_, router_params),
     handler: handle_websocket_message,
     on_close: close_websocket_connection,
   )
@@ -45,15 +57,22 @@ fn upgrade_to_websockets(req, party) {
 
 fn init_websocket(
   _websocket_connection: mist.WebsocketConnection,
-  party,
+  router_params: RouterParams,
 ) -> #(WebsocketState, option.Option(process.Selector(party.ToClientMessage))) {
   let to_client_subject: process.Subject(party.ToClientMessage) =
     process.new_subject()
-  let id = party.join(party, to_client_subject)
+  let id = party.join(router_params.party, to_client_subject)
   let selector = process.new_selector()
   let selector = process.select(selector, to_client_subject)
 
-  #(WebsocketState(to_client_subject, party, id), option.Some(selector))
+  #(
+    WebsocketState(
+      to_client_subject,
+      PartyInfo(router_params.party, id),
+      party_manager: router_params.party_manager,
+    ),
+    option.Some(selector),
+  )
 }
 
 fn handle_websocket_message(
@@ -69,12 +88,16 @@ fn handle_websocket_message(
     mist.Text(text) -> {
       logging.log(logging.Info, "Received message " <> text)
       case json.parse(text, party.direct_websocket_message_decoder()) {
+        Ok(party.CreateParty(building, description)) -> {
+          let _party = party_manager.new_party(state.party_manager, building, description)
+          mist.continue(state)
+        }
         Ok(message) -> {
           party.handle_ws_message(
-            state.party_connection,
+            state.party_info.party_connection,
             message,
             state.to_client_message_subject,
-            state.id,
+            state.party_info.id,
           )
           mist.continue(state)
         }

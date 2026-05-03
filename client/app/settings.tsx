@@ -1,26 +1,17 @@
-import { Text, View, StyleSheet, TouchableOpacity } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { supabase } from '@/lib/supabase';
+import { Text, View, StyleSheet, TouchableOpacity, StatusBar, Platform } from 'react-native';
 
 export default function HomeScreen() {
-	const router = useRouter();
-	const local = useLocalSearchParams();
+	const topPadding = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 20; // 20 is a simple iOS safe offset
+	// const userId = useUserId();
 
-	const start = () => {
-		router.push('/partymenu');
-	}
-	const score = local.score;
 
 	return (
-		<View style={[styles.container]}>
-			<View style={styles.header}>
-				<Text style={styles.title}>Score: {score}</Text>
-			</View>
+		<View style={[styles.container, { paddingTop: topPadding }]}>
 			<View style={styles.content}>
-				<TouchableOpacity
-					style={styles.button}
-					onPress={start}
-				>
-					<Text style={styles.buttonText}>Return To Party Menu</Text>
+				<Text style={styles.subtitle}>Welcome to Dam Clever!</Text>
+				<TouchableOpacity style={styles.button} onPress={() => supabase.auth.signOut()}>
+					<Text style={styles.buttonText}>Sign Out</Text>
 				</TouchableOpacity>
 			</View>
 		</View>
@@ -38,7 +29,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	title: {
-		color: '#D73F09',
+		color: '#fff',
 		fontSize: 24,
 		fontWeight: 'bold',
 	},

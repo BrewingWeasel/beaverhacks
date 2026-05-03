@@ -107,6 +107,7 @@ pub type ToPartyMessage {
 
 pub type DirectWebsocketMessage {
   SendMessage(contents: String)
+  CreateParty(building: String, description: String)
   SwapTile(from: board.LocalCoordinate, direction: board.Direction)
   StartGame
 }
@@ -119,6 +120,11 @@ pub fn direct_websocket_message_decoder() -> decode.Decoder(
     "send_message" -> {
       use contents <- decode.field("contents", decode.string)
       decode.success(SendMessage(contents:))
+    }
+    "create_party" -> {
+      use building <- decode.field("building", decode.string)
+      use description <- decode.field("description", decode.string)
+      decode.success(CreateParty(building:, description:))
     }
     "swap_tile" -> {
       use from <- decode.field("from", board.coordinate_decoder())
@@ -282,6 +288,8 @@ fn handle_message(
           )
       }
     }
+    // hacky but whatever
+    FromClientMessage(CreateParty(..), _, _) -> actor.continue(party)
   }
 }
 
