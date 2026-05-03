@@ -11,15 +11,6 @@ export default function HomeScreen() {
   const router = useRouter();
   const userId = useUserId();
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState('');
-
-  function canSendMessage() {
-	if (!socket || socket.readyState !== WebSocket.OPEN) {
-		setStatus('Connecting to the server...');
-		return false;
-	}
-	return true;
-  }
 
   async function getBuilding() {
 	const { data, error } = await supabase.from('profiles').select("building").eq('id', userId).single();
@@ -32,22 +23,19 @@ export default function HomeScreen() {
   }
 
   async function createParty() {
-    if (!userId || loading || !canSendMessage()) return;
+    if (!userId || !socket) return;
 	setLoading(true);
-	setStatus('Creating party...');
 	try {
 		const building = await getBuilding();
 		socket.send(JSON.stringify({"type": "create_party", "building": building, "description": "todo"}));
 	} catch {
-		setStatus('Could not create a party.');
 		setLoading(false);
 	}
   }
 
   async function findParty() {
-    if (!userId || loading || !canSendMessage()) return;
+    if (!userId || loading || !socket) return;
 	setLoading(true);
-	setStatus('Looking for parties in your building...');
 	try {
 		const building = await getBuilding();
 		const { data, error } = await supabase
@@ -58,7 +46,6 @@ export default function HomeScreen() {
 
 		if (error) throw error;
 		if (!data || data.length === 0) {
-			setStatus('No parties found in your building.');
 			setLoading(false);
 			return;
 		}
@@ -66,7 +53,6 @@ export default function HomeScreen() {
 		socket.send(JSON.stringify({"type": "join_party", "id": data[0].id}));
 	} catch (error) {
 		console.log(error);
-		setStatus('Could not look for parties.');
 		setLoading(false);
 	}
   }
@@ -78,7 +64,6 @@ export default function HomeScreen() {
       </View>
       <View style={styles.content}>
         <Text style={styles.subtitle}>Welcome to Dam Clever!</Text>
-        {status ? <Text style={styles.status}>{status}</Text> : null}
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={createParty}
