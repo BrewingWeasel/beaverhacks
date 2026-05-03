@@ -1,3 +1,4 @@
+import backend/supabase
 import backend/party_manager
 import backend/router
 import envoy
@@ -12,6 +13,7 @@ import simplifile
 pub fn main() {
   logging.set_level(logging.Info)
   load_env()
+  supabase.clear_party_rows()
 
   let assert Ok(party_manager) = party_manager.start()
 

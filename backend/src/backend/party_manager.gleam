@@ -51,7 +51,8 @@ fn handle_message(model: Model, messsage: Message) -> actor.Next(Model, a) {
       actor.continue(Model(parties:))
     }
     JoinParty(id, reply_to) -> {
-      case dict.get(model.parties, id) {
+      echo model.parties
+      case echo dict.get(model.parties, id) {
         Ok(party) -> {
           process.send(reply_to, Ok(party))
           actor.continue(model)
