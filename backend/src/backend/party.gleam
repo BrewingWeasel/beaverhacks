@@ -23,8 +23,8 @@ const milliseconds_gained: Int = 15_000
 const initial_time_left: Int = 40_000
 
 pub type ToClientMessage {
-  PartyCreated(id: String, player_id: Int)
-  PartyJoined(id: String, player_id: Int)
+  PartyCreated(id: String, player_id: Int, description: String)
+  PartyJoined(id: String, player_id: Int, description: String)
   PartyClosed
   ChatMessageSent(contents: String)
   TileUpdated(coordinate: board.LocalCoordinate, new_tile: board.Tile)
@@ -43,16 +43,18 @@ pub fn to_client_message_to_json(
   to_client_message: ToClientMessage,
 ) -> json.Json {
   case to_client_message {
-    PartyCreated(id:, player_id:) ->
+    PartyCreated(id:, player_id:, description:) ->
       json.object([
         #("type", json.string("party_created")),
         #("id", json.string(id)),
+        #("description", json.string(description)),
         #("player_id", json.int(player_id)),
       ])
-    PartyJoined(id:, player_id:) ->
+    PartyJoined(id:, player_id:, description:) ->
       json.object([
         #("type", json.string("party_joined")),
         #("id", json.string(id)),
+        #("description", json.string(description)),
         #("player_id", json.int(player_id)),
       ])
     PartyClosed ->
@@ -113,6 +115,7 @@ pub type PartyModel {
     level: Int,
     round_start_time: timestamp.Timestamp,
     building: String,
+    description: String,
   )
 }
 
@@ -125,6 +128,7 @@ pub type ToPartyMessage {
     reply_to: process.Subject(ToClientMessage),
     id: player.Id,
   )
+  GetDescription(process.Subject(String))
   PartyTimeUp
 }
 
@@ -169,6 +173,7 @@ pub type PartyActor =
 
 pub fn new(
   building: String,
+  description: String,
 ) -> Result(actor.Started(process.Subject(ToPartyMessage)), actor.StartError) {
   actor.new_with_initialiser(1000, fn(subject: process.Subject(ToPartyMessage)) {
     let selector = process.new_selector() |> process.select(subject)
@@ -181,6 +186,7 @@ pub fn new(
       level: 1,
       round_start_time: timestamp.system_time(),
       building:,
+      description:,
       subject:,
     ))
     |> actor.returning(subject)
@@ -233,6 +239,10 @@ fn handle_message(
       actor.continue(
         PartyModel(..party, clients: dict.delete(party.clients, id)),
       )
+    }
+    GetDescription(reply_to) -> {
+      process.send(reply_to, party.description)
+      actor.continue(party)
     }
     Close -> {
       dict.each(party.clients, fn(_id, member) {
@@ -398,4 +408,10 @@ pub fn handle_ws_message(
   id: player.Id,
 ) -> Nil {
   actor.send(party.data, FromClientMessage(message, reply_to, id))
+}
+
+pub fn get_description(
+  party_connection: actor.Started(process.Subject(ToPartyMessage)),
+) -> String {
+  process.call(party_connection.data, 1000, GetDescription)
 }

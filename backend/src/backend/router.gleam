@@ -107,7 +107,7 @@ fn handle_websocket_message(
               let player.Id(player_id) = id
               process.send(
                 state.to_client_message_subject,
-                party.PartyCreated(created.id.id, player_id),
+                party.PartyCreated(created.id.id, player_id, description),
               )
               mist.continue(
                 WebsocketState(
@@ -142,11 +142,15 @@ fn handle_websocket_message(
                       party_connection,
                       state.to_client_message_subject,
                     )
+
                   let player.Id(raw_player_id) = player_id
+                  let description = party.get_description(party_connection)
+
                   process.send(
                     state.to_client_message_subject,
-                    party.PartyJoined(id, raw_player_id),
+                    party.PartyJoined(id, raw_player_id, description),
                   )
+
                   mist.continue(
                     WebsocketState(
                       ..state,

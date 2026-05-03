@@ -41,9 +41,9 @@ pub type Message {
 
 fn handle_message(model: Model, messsage: Message) -> actor.Next(Model, a) {
   case messsage {
-    NewParty(building, _description, reply_to) -> {
+    NewParty(building, description, reply_to) -> {
       let party_id = PartyId(uuid.to_string(uuid.v7()))
-      let assert Ok(party) = party.new(building)
+      let assert Ok(party) = party.new(building, description)
       supabase.create_party_row(party_id.id, building)
       process.send(reply_to, CreatedParty(id: party_id, party:))
 
