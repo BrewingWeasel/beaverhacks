@@ -74,6 +74,9 @@ export default function SwipePuzzle() {
 
   const [timer, setTimer] = useState(boardInfo.time_left);
 
+  const [solved, setSolved] = useState(false);
+  const solvedOpacity = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
 	  console.log(score);
 
@@ -87,22 +90,33 @@ export default function SwipePuzzle() {
   }, [])
 
   useEffect(() => {
-	if (!socket) return;
-  const existingOnMessage = socket.onmessage
-	socket.onmessage = (data) => {
-		console.log("Received message:", data._data);
-		const message = JSON.parse(data._data);
-		if (message.type == "tile_updated") { 
-		  setBoard((prev) => {
-			  const newBoard = [...prev];
-			  newBoard[message.coordinate.y][message.coordinate.x] = message.new_tile;
-			  return newBoard;
-		  })
-		} else {
-			existingOnMessage(data);
-		}
-	};
-  }, [socket])
+    if (!socket) return;
+    const existingOnMessage = socket.onmessage;
+    socket.onmessage = (data) => {
+      console.log("Received message:", data._data);
+      const message = JSON.parse(data._data);
+      if (message.type === "tile_updated") {
+        setBoard((prev) => {
+          const newBoard = [...prev];
+          newBoard[message.coordinate.y][message.coordinate.x] = message.new_tile;
+          return newBoard;
+        });
+      } else if (message.type === "board_solved") {
+		// Make animation better oop
+        setSolved(true);
+        solvedOpacity.setValue(1);
+        setTimeout(() => {
+          Animated.timing(solvedOpacity, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: true,
+          }).start(() => setSolved(false));
+        }, 1000);
+      } else {
+        existingOnMessage(data);
+      }
+    };
+  }, [socket]);
 
   function handleSwipe(row, col, direction) {
 	  if (!socket) return;
@@ -160,6 +174,11 @@ export default function SwipePuzzle() {
 			</View>
 		  ))}
 		</View>
+	  {solved && (
+		  <Animated.View style={[styles.solvedOverlay, { opacity: solvedOpacity }]}>
+		  <Text style={styles.solvedText}>Solved!</Text>
+		  </Animated.View>
+	  )}
 	  </View>
   )
 }
@@ -176,4 +195,17 @@ const styles = StyleSheet.create({
     width: 20, height: 20, margin: 2,
     borderRadius: 8,
   },
+	solvedOverlay: {
+		position: 'absolute',
+		top: 0, left: 0, right: 0, bottom: 0,
+		backgroundColor: 'rgba(0,0,0,0.55)',
+		justifyContent: 'center',
+		alignItems: 'center',
+		zIndex: 99,
+	},
+	solvedText: {
+		fontSize: 48,
+		fontWeight: 'bold',
+		color: '#2ECC71',
+	},
 })
