@@ -63,7 +63,7 @@ export default function SignIn({ onNavigateToSignUp }: SignInProps) {
 
       <TouchableOpacity onPress={onNavigateToSignUp}>
         <Text style={styles.link}>
-          Don't have an account? <Text style={styles.linkBold}>Sign up</Text>
+          Don&apos;t have an account? <Text style={styles.linkBold}>Sign up</Text>
         </Text>
       </TouchableOpacity>
     </View>

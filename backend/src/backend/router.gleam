@@ -13,10 +13,7 @@ import wisp
 import wisp/wisp_mist
 
 pub type RouterParams {
-  RouterParams(
-    party_manager: party_manager.PartyManagerActor,
-    party: party.PartyActor,
-  )
+  RouterParams(party_manager: party_manager.PartyManagerActor)
 }
 
 pub fn mist_router(
@@ -37,13 +34,18 @@ fn wisp_handle_request(_request) {
 type WebsocketState {
   WebsocketState(
     to_client_message_subject: process.Subject(party.ToClientMessage),
-    party_info: PartyInfo,
+    party_info: option.Option(PartyInfo),
     party_manager: party_manager.PartyManagerActor,
   )
 }
 
 type PartyInfo {
-  PartyInfo(party_connection: party.PartyActor, id: player.Id)
+  PartyInfo(
+    party_id: party_manager.PartyId,
+    party_connection: party.PartyActor,
+    id: player.Id,
+    is_leader: Bool,
+  )
 }
 
 fn upgrade_to_websockets(req, router_params) {
@@ -61,14 +63,13 @@ fn init_websocket(
 ) -> #(WebsocketState, option.Option(process.Selector(party.ToClientMessage))) {
   let to_client_subject: process.Subject(party.ToClientMessage) =
     process.new_subject()
-  let id = party.join(router_params.party, to_client_subject)
   let selector = process.new_selector()
   let selector = process.select(selector, to_client_subject)
 
   #(
     WebsocketState(
       to_client_subject,
-      PartyInfo(router_params.party, id),
+      option.None,
       party_manager: router_params.party_manager,
     ),
     option.Some(selector),
@@ -89,16 +90,98 @@ fn handle_websocket_message(
       logging.log(logging.Info, "Received message " <> text)
       case json.parse(text, party.direct_websocket_message_decoder()) {
         Ok(party.CreateParty(building, description)) -> {
-          let _party = party_manager.new_party(state.party_manager, building, description)
-          mist.continue(state)
+          case state.party_info {
+            option.Some(_) -> {
+              logging.log(logging.Warning, "Ignoring create_party after join")
+              mist.continue(state)
+            }
+            option.None -> {
+              let created =
+                party_manager.new_party(
+                  state.party_manager,
+                  building,
+                  description,
+                )
+              let id =
+                party.join(created.party, state.to_client_message_subject)
+              let player.Id(player_id) = id
+              process.send(
+                state.to_client_message_subject,
+                party.PartyCreated(created.id.id, player_id),
+              )
+              mist.continue(
+                WebsocketState(
+                  ..state,
+                  party_info: option.Some(PartyInfo(
+                    party_id: created.id,
+                    party_connection: created.party,
+                    id:,
+                    is_leader: True,
+                  )),
+                ),
+              )
+            }
+          }
+        }
+        Ok(party.JoinParty(id)) -> {
+          case state.party_info {
+            option.Some(_) -> {
+              logging.log(logging.Warning, "Ignoring join_party after join")
+              mist.continue(state)
+            }
+            option.None -> {
+              case
+                party_manager.join_party(
+                  state.party_manager,
+                  party_manager.PartyId(id),
+                )
+              {
+                Ok(party_connection) -> {
+                  let player_id =
+                    party.join(
+                      party_connection,
+                      state.to_client_message_subject,
+                    )
+                  let player.Id(raw_player_id) = player_id
+                  process.send(
+                    state.to_client_message_subject,
+                    party.PartyJoined(id, raw_player_id),
+                  )
+                  mist.continue(
+                    WebsocketState(
+                      ..state,
+                      party_info: option.Some(PartyInfo(
+                        party_id: party_manager.PartyId(id),
+                        party_connection:,
+                        id: player_id,
+                        is_leader: False,
+                      )),
+                    ),
+                  )
+                }
+                Error(Nil) -> {
+                  logging.log(
+                    logging.Warning,
+                    "Tried to join unknown party " <> id,
+                  )
+                  mist.continue(state)
+                }
+              }
+            }
+          }
         }
         Ok(message) -> {
-          party.handle_ws_message(
-            state.party_info.party_connection,
-            message,
-            state.to_client_message_subject,
-            state.party_info.id,
-          )
+          case state.party_info {
+            option.Some(party_info) ->
+              party.handle_ws_message(
+                party_info.party_connection,
+                message,
+                state.to_client_message_subject,
+                party_info.id,
+              )
+            option.None ->
+              logging.log(logging.Warning, "Ignoring party message before join")
+          }
           mist.continue(state)
         }
         Error(_) -> {
@@ -127,7 +210,10 @@ fn handle_websocket_message(
           )
         Ok(Nil) -> Nil
       }
-      mist.continue(state)
+      case server_message {
+        party.PartyClosed -> mist.stop()
+        _ -> mist.continue(state)
+      }
     }
     mist.Closed | mist.Shutdown -> {
       logging.log(
@@ -139,6 +225,18 @@ fn handle_websocket_message(
   }
 }
 
-fn close_websocket_connection(_websocket_state: WebsocketState) -> Nil {
-  Nil
+fn close_websocket_connection(websocket_state: WebsocketState) -> Nil {
+  case websocket_state.party_info {
+    option.None -> Nil
+    option.Some(party_info) -> {
+      case party_info.is_leader {
+        True ->
+          party_manager.delete_party(
+            websocket_state.party_manager,
+            party_info.party_id,
+          )
+        False -> party.leave(party_info.party_connection, party_info.id)
+      }
+    }
+  }
 }

@@ -1,24 +1,22 @@
 import backend/party_manager
-import envoy
-import gleam/result
-import gleam/list
-import gleam/string
-import backend/party
 import backend/router
+import envoy
 import gleam/erlang/process
+import gleam/list
+import gleam/result
+import gleam/string
 import logging
 import mist
 import simplifile
 
 pub fn main() {
-  logging.set_level(logging.Debug)
+  logging.set_level(logging.Info)
   load_env()
 
-  let assert Ok(party) = party.new()
   let assert Ok(party_manager) = party_manager.start()
 
   let assert Ok(_) =
-    router.mist_router(_, router.RouterParams(party_manager, party))
+    router.mist_router(_, router.RouterParams(party_manager))
     |> mist.new
     |> mist.bind("0.0.0.0")
     |> mist.port(8000)

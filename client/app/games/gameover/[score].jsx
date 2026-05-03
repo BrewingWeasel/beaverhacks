@@ -6,7 +6,7 @@ export default function HomeScreen() {
 	const local = useLocalSearchParams();
 
 	const start = () => {
-		router.push('/partymenu');
+		router.push('/lobby');
 	}
 	const score = local.score;
 

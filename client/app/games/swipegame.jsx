@@ -1,4 +1,4 @@
-import { StyleSheet, View, PanResponder, Text, TouchableOpacity, Animated } from 'react-native'
+import { StyleSheet, View, PanResponder, Text, Animated } from 'react-native'
 import React, { useEffect, useState, useRef } from 'react'
 import { useBoard } from '../../context/BoardContext'
 import { useSocket } from '../../context/SocketContext'
@@ -93,8 +93,9 @@ export default function SwipePuzzle() {
     if (!socket) return;
     const existingOnMessage = socket.onmessage;
     socket.onmessage = (data) => {
-      console.log("Received message:", data._data);
-      const message = JSON.parse(data._data);
+      const rawMessage = data.data ?? data._data;
+      console.log("Received message:", rawMessage);
+      const message = JSON.parse(rawMessage);
       if (message.type === "tile_updated") {
         setBoard((prev) => {
           const newBoard = [...prev];
@@ -113,7 +114,7 @@ export default function SwipePuzzle() {
           }).start(() => setSolved(false));
         }, 1000);
       } else {
-        existingOnMessage(data);
+        existingOnMessage?.(data);
       }
     };
   }, [socket]);

@@ -22,6 +22,9 @@ const milliseconds_gained: Int = 15_000
 const initial_time_left: Int = 20_000
 
 pub type ToClientMessage {
+  PartyCreated(id: String, player_id: Int)
+  PartyJoined(id: String, player_id: Int)
+  PartyClosed
   ChatMessageSent(contents: String)
   TileUpdated(coordinate: board.LocalCoordinate, new_tile: board.Tile)
   BoardCreated(
@@ -39,6 +42,22 @@ pub fn to_client_message_to_json(
   to_client_message: ToClientMessage,
 ) -> json.Json {
   case to_client_message {
+    PartyCreated(id:, player_id:) ->
+      json.object([
+        #("type", json.string("party_created")),
+        #("id", json.string(id)),
+        #("player_id", json.int(player_id)),
+      ])
+    PartyJoined(id:, player_id:) ->
+      json.object([
+        #("type", json.string("party_joined")),
+        #("id", json.string(id)),
+        #("player_id", json.int(player_id)),
+      ])
+    PartyClosed ->
+      json.object([
+        #("type", json.string("party_closed")),
+      ])
     ChatMessageSent(contents:) ->
       json.object([
         #("type", json.string("chat_message_sent")),
@@ -97,6 +116,8 @@ pub type PartyModel {
 
 pub type ToPartyMessage {
   Join(process.Subject(ToClientMessage), process.Subject(player.Id))
+  Leave(player.Id)
+  Close
   FromClientMessage(
     DirectWebsocketMessage,
     reply_to: process.Subject(ToClientMessage),
@@ -108,6 +129,7 @@ pub type ToPartyMessage {
 pub type DirectWebsocketMessage {
   SendMessage(contents: String)
   CreateParty(building: String, description: String)
+  JoinParty(id: String)
   SwapTile(from: board.LocalCoordinate, direction: board.Direction)
   StartGame
 }
@@ -125,6 +147,10 @@ pub fn direct_websocket_message_decoder() -> decode.Decoder(
       use building <- decode.field("building", decode.string)
       use description <- decode.field("description", decode.string)
       decode.success(CreateParty(building:, description:))
+    }
+    "join_party" -> {
+      use id <- decode.field("id", decode.string)
+      decode.success(JoinParty(id:))
     }
     "swap_tile" -> {
       use from <- decode.field("from", board.coordinate_decoder())
@@ -199,6 +225,23 @@ fn handle_message(
 
       actor.continue(
         PartyModel(..party, clients: new_clients, next_id: party.next_id + 1),
+      )
+    }
+    Leave(id) -> {
+      actor.continue(
+        PartyModel(..party, clients: dict.delete(party.clients, id)),
+      )
+    }
+    Close -> {
+      dict.each(party.clients, fn(_id, member) {
+        process.send(member, PartyClosed)
+      })
+      case party.current_mode {
+        Lobby -> Nil
+        InGame(_, timer_pid) -> process.kill(timer_pid)
+      }
+      actor.continue(
+        PartyModel(..party, clients: dict.new(), current_mode: Lobby),
       )
     }
     FromClientMessage(SendMessage(message), _reply_to, _id) -> {
@@ -290,6 +333,7 @@ fn handle_message(
     }
     // hacky but whatever
     FromClientMessage(CreateParty(..), _, _) -> actor.continue(party)
+    FromClientMessage(JoinParty(..), _, _) -> actor.continue(party)
   }
 }
 
@@ -334,6 +378,14 @@ fn start_board(party: PartyModel) {
 
 pub fn join(party: PartyActor, client: process.Subject(ToClientMessage)) {
   actor.call(party.data, 1000, Join(client, _))
+}
+
+pub fn leave(party: PartyActor, id: player.Id) -> Nil {
+  actor.send(party.data, Leave(id))
+}
+
+pub fn close(party: PartyActor) -> Nil {
+  actor.send(party.data, Close)
 }
 
 pub fn handle_ws_message(
